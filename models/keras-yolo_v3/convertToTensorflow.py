@@ -104,7 +104,7 @@ if __name__ == '__main__':
 
         keras_model = SqueezeNet()
 
-        keras_model.load_weights("/Users/henry/Documents/application/keras-yolo3/model_data/yolo3.h5")
+        keras_model.load_weights("/Users/henry/Documents/application/substation/models/keras-yolo_v3/model_data/yolo3.h5")
 
 
         output_dir = os.path.join(os.getcwd(),"checkpoint")
