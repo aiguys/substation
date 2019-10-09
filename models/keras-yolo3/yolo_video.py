@@ -3,8 +3,10 @@ import argparse
 from yolo import YOLO, detect_video
 from PIL import Image
 import time
+import os
 
 def detect_img(yolo):
+   # ''''
     while True:
         img = input('Input image filename:')
         try:
@@ -12,12 +14,36 @@ def detect_img(yolo):
         except:
             print('Open Error! Try again!')
             continue
+        # 如果不抛出except的异常，执行else
         else:
             start = time.clock()
             r_image = yolo.detect_image(image)
             elapsed = (time.clock() - start)
             print("Time used:", elapsed)
             r_image.show()
+    '''''
+
+    wd = 'D:\GitHub_Repository\Data\VOC2028Helmet'
+
+    if not os.path.exists(wd + '\ImageSets\detection-results'):
+        os.makedirs(wd + '\ImageSets\detection-results')
+    image_ids = open(
+        'D:\GitHub_Repository\Data\VOC2028Helmet\ImageSets\Main\%s.txt' % ('test')).read().strip().split()
+    for image_id in image_ids:
+        try:
+            #print(wd + '\JPEGImages\\' + image_id)
+            image = Image.open(wd + '\JPEGImages\\%s.jpg'  %(image_id))
+        except:
+            print('Open Error!' + image_id)
+            break
+        else:
+            list_file = open(wd + '\ImageSets\detection-results\%s.txt' % (image_id), 'w')  # 以写模式为每一张image创建txt文件
+            start = time.clock()
+            print("Inference and processing on " + image_id)
+            yolo.detect_image(image,list_file)
+            elapsed = (time.clock() - start)
+            print("Time used:", elapsed)
+    '''''
     yolo.close_session()
 
 FLAGS = None

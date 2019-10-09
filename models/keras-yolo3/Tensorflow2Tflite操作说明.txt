@@ -1,0 +1,32 @@
+pb文件转tflite的指令说明：
+tflite_convert --output_file=./model_data/tf.tflite \
+--graph_def_file=./model_data/saved_model.pb  \
+--input_arrays=input_1 --input_shape=1,416,416,3 \
+--output_arrays=conv2d_13/BiasAdd \
+--output_arrays=conv2d_10/BiasAdd \
+
+
+参数说明，input_arrays和output_arrays是model的起始输入变量名和结束变量名，
+input_shape是和input_arrays对应。查看这些模型参数可以到 tensorflow目录下
+到lite.py中print 模型的input和output tensor_name信息，我的目录地址
+D:\Anaconda\envs\tfenv\Lib\site-packages\tensorflow\lite\python\lite.py
+在方法from_keras_model_file（）下，764行左右添加print语句查看，设断点查看tensor_name.
+
+
+tflite_convert --output_file=./model_data/yolo-tiny-quan.tflite \
+--graph_def_file=./model_data/saved_model.pb \
+--inference_type=QUANTIZED_UINT8 --input_arrays=input_1 \
+--input_shape=1,416,416,3 \
+--output_arrays=conv2d_13/BiasAdd --output_arrays=conv2d_10/BiasAdd \
+--mean_values=128 --std_dev_values=127 \
+--default_ranges_min=0 --default_ranges_max=6(为了精确的结果请去除这一行)(确定activation func的输出范围大致是0-6)
+
+bazel run tensorflow\lite\toco:toco -- 
+--input_file=D:\GitHub_Repository\substation\models\yolov3_keras_tflite-master\model_data\tiny_yolo_model.pb 
+--output_file=model_data\detect.tflite 
+--input_shapes=1,416,416,3 --input_arrays=input_1
+
+tflite_convert --output_file=./model_data/ssdInception.tflite 
+--graph_def_file=./model_data/ssd-inception.pb 
+--input_arrays=input_1 --input_shape=1,300,300,3 
+--output_arrays=conv2d_13/BiasAdd

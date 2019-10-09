@@ -16,7 +16,7 @@ def convert_annotation(image_id, list_file):
     for obj in root.iter('object'):
         difficult = obj.find('difficult').text
         cls = obj.find('name').text
-        if cls not in classes:  # or difficult = 1 pass the small difficult hats
+        if cls not in classes or int(difficult)==1:  # image中class极小xml中存在difficult标注为1，这里默认跳过不训练这种图像，后期有需要可以去掉这个条件进行训练
             continue
         cls_id = classes.index(cls)
         xmlbox = obj.find('bndbox')
