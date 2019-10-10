@@ -15,7 +15,7 @@ from yolo3.utils import get_random_data
 
 def _main():
     annotation_path = 'train.txt'
-    log_dir = 'logs/001/'
+    log_dir = 'logs/000/'
     classes_path = 'cfg/hat_classes.txt' # 注意txt文档中的class_name顺序与voc_annotation.py sets中顺序一致
     anchors_path = 'cfg/tiny_yolo_anchors.txt' # 选择对应的yolo或tiny anchors
     class_names = get_classes(classes_path)
@@ -27,15 +27,15 @@ def _main():
     is_tiny_version = len(anchors)==6 # 判断是否使用tiny yolo anchors
     if is_tiny_version:
         model = create_tiny_model(input_shape, anchors, num_classes,
-            freeze_body=2, weights_path='model_data/yolo-tiny.h5')
-            #freeze_body=2, weights_path='model_data/ep053-loss24.596-val_loss25.318.h5')
+            #freeze_body=2, weights_path='model_data/yolo-tiny.h5')
+            freeze_body=2, weights_path='logs/000/ep018-loss28.307-val_loss28.648.h5')
     else:
         model = create_model(input_shape, anchors, num_classes,
             freeze_body=2, weights_path='model_data/yolo_weights.h5') # make sure you know what you freeze
 
     logging = TensorBoard(log_dir=log_dir)
     checkpoint = ModelCheckpoint(log_dir + 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5',
-        monitor='val_loss', save_weights_only=True, save_best_only=True, period=3)# 每3个echo保存一次最好的模型
+        monitor='val_loss', save_weights_only=False, save_best_only=True, period=1)# 每3个echo保存一次最好的模型
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, verbose=1)
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1)
 
@@ -50,24 +50,24 @@ def _main():
 
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
-# 训练最后两层（已完成该stage one）
+    #'''训练最后两层（已完成该stage one）
     if True:
-        model.compile(optimizer=Adam(lr=1e-3), loss={
+        model.compile(optimizer=Adam(lr=1e-2), loss={
             # use custom yolo_loss Lambda layer.
             'yolo_loss': lambda y_true, y_pred: y_pred})
 
         batch_size = 32
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
-        print("Train with lr = 1e-3")   
+        print("Train with lr = 1e-2")   
         model.fit_generator(data_generator_wrapper(lines[:num_train], batch_size, input_shape, anchors, num_classes),
                 steps_per_epoch=max(1, num_train//batch_size),
                 validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
                 validation_steps=max(1, num_val//batch_size),
-                epochs=25,
-                initial_epoch=0,
+                epochs=30,
+                initial_epoch=28,
                 callbacks=[logging, checkpoint])
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
-
+    #'''
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
     if True:
@@ -82,8 +82,8 @@ def _main():
             steps_per_epoch=max(1, num_train//batch_size),
             validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
             validation_steps=max(1, num_val//batch_size),
-            epochs=50,
-            initial_epoch=25,
+            epochs=100,
+            initial_epoch=50,
             callbacks=[logging, checkpoint, reduce_lr, early_stopping])
         model.save_weights(log_dir + 'trained_weights_final.h5')
 
