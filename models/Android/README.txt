@@ -1,3 +1,5 @@
+使用Android Studio打开目录地址\substation\models\Android\tensorflow-yolo\tensorflow\examples下的Android工程。
+
 Android Studio工程实现tiny-YOLOv3目标检测工程在Android移动端的应用，模型文件要求tensorflow的pb文件，依据TensorflowInferenceInterface
 接口实现pb模型文件的推断过程，结果经过接口提供的fetch方法再结合递归循环查询大于一定的confidence就存储在priorityQueue中，tiny-yolov3两个
 两个感受野分别为13*13与26*26两路输出分别存储在两个priorityQueue中，输出结果取两个queue中confidence的top n画框。

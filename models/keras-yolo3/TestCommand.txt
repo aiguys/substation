@@ -1,0 +1,6 @@
+﻿进入到yolo.py对model path，anchors path和class.txt path进行设置
+
+ 暂未查明不可用原因：
+python yolo_video.py --image --model 'D:\GitHub_Repository\keras-yolo3\logs\000\ep0012-loss29.358-val_loss29.087.h5' 
+--anchors 'D:\GitHub_Repository\keras-yolo3\cfg\tiny_yolo_anchors.txt' 
+--classes 'D:\GitHub_Repository\keras-yolo3\cfg\hat_classes.txt'
