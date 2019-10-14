@@ -5,5 +5,7 @@ Android Studio工程实现tiny-YOLOv3目标检测工程在Android移动端的应用，模型文件要求
 两个感受野分别为13*13与26*26两路输出分别存储在两个priorityQueue中，输出结果取两个queue中confidence的top n画框。
 
 TODO:
-1. 根据不同的感受野选择大小不同的anchors，目前在两个感受野取结果时都是使用了所有的6组anchors；
+1. 寻找合适的anchors值
 2. 根据项目工程的不同，k-means的方法得到合适的anchors的值
+3. YOLODetector中涉及offset的计算以及与NUM_BOXES_PER_BLOCK先验框的关系暂未弄清：offset可以理解为output tensor的索引，可以取出位置坐标等的output信息
+4.需要调试offset与output tensor那个地方，output tensor目前取的大小错误，应该是13* 13* (2+ 5) * 6/2

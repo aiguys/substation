@@ -17,6 +17,7 @@ package org.tensorflow.demo;
 
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Trace;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public class TensorFlowYoloDetector implements Classifier {
 
   // Only return this many results with at least this confidence.
   private static final int MAX_RESULTS = 5;
+  private static final float Iou_thread = 0.35f;
 
   //private static final int NUM_CLASSES = 20;
 
@@ -40,13 +42,15 @@ public class TensorFlowYoloDetector implements Classifier {
 
   // TODO(andrewharp): allow loading anchors and classes
   // from files.
- /* private static final double[] ANCHORS = {
+  /*private static final double[] ANCHORS = {
     1.08, 1.19,
     3.42, 4.41,
     6.63, 11.38,
-    9.42, 5.11,
-    16.62, 10.52
+    9.42, 9.50,
+    10.02, 11.31,
+    16.62, 16.52
   };*/
+  // 一组anchor pair第一个是anchor的宽w，第二个是anchor的高h 例w=10，h=14
   private static final double[] ANCHORS = {
           10, 14,
           23, 27,
@@ -148,8 +152,9 @@ private static final String[] LABELS = {
     }
   }
 
+
   @Override
-  public List<List<Recognition>> recognizeImage(final Bitmap bitmap) {
+  public List<Recognition> recognizeImage(final Bitmap bitmap) {
     final SplitTimer timer = new SplitTimer("recognizeImage");
 
     // Log this method so that it can be analyzed with systrace.
@@ -185,14 +190,15 @@ private static final String[] LABELS = {
     Trace.beginSection("fetch");
     final int PF1_gridWidth = bitmap.getWidth() / PF1_blockSize; // 416 / 32 = 13
     final int PF1_gridHeight = bitmap.getHeight() / PF1_blockSize;
-    // output是13*13感受野尺度上的tensor，gridWidth=gridHeight=13，NUM_BOXES_PER_BLOCK=6代表anchor box pairs，5代表4个位置坐标 + 1 confidence
+    // output是13*13感受野尺度上的三维tensor，13*13*(NUM_CLASSES + 5)*3拉成一维array，size=3549
+    // gridWidth=gridHeight=13，NUM_BOXES_PER_BLOCK=6代表anchor box pairs，5代表4个位置坐标 + 1 confidence
     final float[] output =
-        new float[PF1_gridWidth * PF1_gridHeight * (NUM_CLASSES + 5) * NUM_BOXES_PER_BLOCK];
+        new float[PF1_gridWidth * PF1_gridHeight * (NUM_CLASSES + 5) * (NUM_BOXES_PER_BLOCK / 2)]; //在13*13尺度上只使用了3组anchors，即6/2=3
     inferenceInterface.fetch(outputNames[0], output); //取出名为outputNames[0]的tensor，读取结果进output字节大小的Flatbuffer； Creates a new float buffer by wrapping the given float array.
     Trace.endSection();
 
     // Find the best detections.
-    final PriorityQueue<Recognition> pf1_pq =
+    final PriorityQueue<Recognition> pq =
         new PriorityQueue<Recognition>(
             1,
             new Comparator<Recognition>() {
@@ -202,20 +208,21 @@ private static final String[] LABELS = {
                 return Float.compare(rhs.getConfidence(), lhs.getConfidence());
               }
             });
-    // 开始在每个yolo cell上进行regression过程判断是否有物体
+    // 开始在13*13的feature map上对每个yolo cell上进行判断是否有物体, offset可以理解为output array的index
+    // offset 0:1是x，y坐标，2:3是w，h，4是confidence，5以后（5:6）是class的预测概率
     for (int y = 0; y < PF1_gridHeight; ++y) {
       for (int x = 0; x < PF1_gridWidth; ++x) {
-        for (int b = 0; b < NUM_BOXES_PER_BLOCK; ++b) {
+        for (int b = 3; b < NUM_BOXES_PER_BLOCK; ++b) { // b 用于选择anchors，13*13大感受野选择大anchors
           final int offset =
-              (PF1_gridWidth * (NUM_BOXES_PER_BLOCK * (NUM_CLASSES + 5))) * y
-                  + (NUM_BOXES_PER_BLOCK * (NUM_CLASSES + 5)) * x
-                  + (NUM_CLASSES + 5) * b;
+              (PF1_gridWidth * (NUM_BOXES_PER_BLOCK / 2 * (NUM_CLASSES + 5))) * y //13 * 3 * 7 * 13
+                  + (NUM_BOXES_PER_BLOCK / 2 * (NUM_CLASSES + 5)) * x // 3 * 7 * 13
+                  + (NUM_CLASSES + 5) * (b - 3); //7 * 3
 
-          final float xPos = (x + expit(output[offset + 0])) * PF1_blockSize;
+          final float xPos = (x + expit(output[offset + 0])) * PF1_blockSize; //放缩回416的image尺寸
           final float yPos = (y + expit(output[offset + 1])) * PF1_blockSize;
           //根据若干组anchors计算当前x，y坐标的W和H（即以anchor box为前提计算出当前坐标的bounding box）
-          final float w = (float) (Math.exp(output[offset + 2]) * ANCHORS[2 * b + 0]) * PF1_blockSize;
-          final float h = (float) (Math.exp(output[offset + 3]) * ANCHORS[2 * b + 1]) * PF1_blockSize;
+          final float w = (float) (Math.exp(output[offset + 2]) * ANCHORS[2 * b + 0]) ;//保留13*13 feature map的bbox尺寸
+          final float h = (float) (Math.exp(output[offset + 3]) * ANCHORS[2 * b + 1]) ;
 
           final RectF rect =
               new RectF(
@@ -242,26 +249,27 @@ private static final String[] LABELS = {
           }
 
           final float confidenceInClass = maxClass * confidence;
-          if (confidenceInClass > 0.01) {
+          if (confidenceInClass > 0.01 && confidenceInClass != 0.25) { // 原因不明，无时无刻对任何输入都有一个confidence=0.25的person输出调试后应该是output fetch出来的信息有些问题。line226，233，240,244
             LOGGER.i(
                 "%s (%d) %f %s", LABELS[detectedClass], detectedClass, confidenceInClass, rect);
-            pf1_pq.add(new Recognition("" + offset, LABELS[detectedClass], confidenceInClass, rect)); //为priority queue写进output结果
+              pq.add(new Recognition("" + offset, LABELS[detectedClass], confidenceInClass, rect)); //为priority queue写进output结果
           }
         }
       }
     }
 
     timer.endSplit("decoded results");
-
+    final List<Recognition> recognitions = new ArrayList<Recognition>();
+    /*
     final List<List<Recognition>> recognitions = new ArrayList<List<Recognition>>();
     final ArrayList<Recognition> recognitionsTEMP = new ArrayList<Recognition>();
-    for (int i = 0; i < Math.min(pf1_pq.size(), MAX_RESULTS); ++i) {
-      recognitionsTEMP.add(pf1_pq.poll());
+    for (int i = 0; i < Math.min(pq.size(), MAX_RESULTS); ++i) {
+      recognitionsTEMP.add(pq.poll());
     }
     recognitions.add(recognitionsTEMP);
     Trace.endSection(); // "recognizeImage"
 
-    timer.endSplit("processed results");
+    timer.endSplit("processed results"); */
 
     // Copy the 2-nd reception field output Tensor back into the output array.
     Trace.beginSection("fetch");
@@ -269,12 +277,12 @@ private static final String[] LABELS = {
     final int PF2_gridHeight = bitmap.getHeight() / PF2_blockSize;
     // output是26*26感受野尺度上的tensor，gridWidth=gridHeight=26，NUM_BOXES_PER_BLOCK=6代表anchor box pairs，5代表4个位置坐标 + 1 confidence
     final float[] PF2_output =
-            new float[PF2_gridWidth * PF2_gridHeight * (NUM_CLASSES + 5) * NUM_BOXES_PER_BLOCK];
+            new float[PF2_gridWidth * PF2_gridHeight * (NUM_CLASSES + 5) * (NUM_BOXES_PER_BLOCK / 2)]; //在26*26尺度上只使用了3组anchors，即6/2=3
     inferenceInterface.fetch(outputNames[1], PF2_output); //取出名为outputNames[1]的tensor，读取结果进output字节大小的Flatbuffer； Creates a new float buffer by wrapping the given float array.
     Trace.endSection();
 
     // Find the best detections.
-    final PriorityQueue<Recognition> pf2_pq =
+   /* final PriorityQueue<Recognition> pf2_pq =
             new PriorityQueue<Recognition>(
                     1,
                     new Comparator<Recognition>() {
@@ -283,21 +291,22 @@ private static final String[] LABELS = {
                         // Intentionally reversed to put high confidence at the head of the queue.
                         return Float.compare(rhs.getConfidence(), lhs.getConfidence());
                       }
-                    });
-    // 开始在每个yolo cell上进行regression过程判断是否有物体
+                    }); */
+    // 开始在26*126的feature map上进行判断是否有物体，offset理解为output array的index
+    // offset 0:1是x，y坐标，2:3是w，h，4是confidence，5以后（5:6）是class的预测概率
     for (int y = 0; y < PF2_gridHeight; ++y) {
       for (int x = 0; x < PF2_gridWidth; ++x) {
-        for (int b = 0; b < NUM_BOXES_PER_BLOCK; ++b) {
+        for (int b = 0; b < NUM_BOXES_PER_BLOCK / 2; ++b) { // b 用于选择anchors，26*26小感受野选择小anchors
           final int offset =
-                  (PF2_gridWidth * (NUM_BOXES_PER_BLOCK * (NUM_CLASSES + 5))) * y
-                          + (NUM_BOXES_PER_BLOCK * (NUM_CLASSES + 5)) * x
-                          + (NUM_CLASSES + 5) * b;
+                  (PF2_gridWidth * (NUM_BOXES_PER_BLOCK / 2  * (NUM_CLASSES + 5))) * y //13 * 3 * 7 * 13
+                          + (NUM_BOXES_PER_BLOCK / 2  * (NUM_CLASSES + 5)) * x //3 * 7 * 13
+                          + (NUM_CLASSES + 5) * b; // 7 * 3
 
-          final float xPos = (x + expit(PF2_output[offset + 0])) * PF2_blockSize;
+          final float xPos = (x + expit(PF2_output[offset + 0])) * PF2_blockSize;//放缩回416的image尺寸
           final float yPos = (y + expit(PF2_output[offset + 1])) * PF2_blockSize;
           //根据若干组anchors计算当前x，y坐标的W和H（即以anchor box为前提计算出当前坐标的bounding box）
-          final float w = (float) (Math.exp(PF2_output[offset + 2]) * ANCHORS[2 * b + 0]) * PF2_blockSize;
-          final float h = (float) (Math.exp(PF2_output[offset + 3]) * ANCHORS[2 * b + 1]) * PF2_blockSize;
+          final float w = (float) (Math.exp(PF2_output[offset + 2]) * ANCHORS[2 * b + 0]) ;//保留26*26 feature map的bbox尺寸
+          final float h = (float) (Math.exp(PF2_output[offset + 3]) * ANCHORS[2 * b + 1]) ;
 
           final RectF rect =
                   new RectF(
@@ -324,10 +333,10 @@ private static final String[] LABELS = {
           }
 
           final float confidenceInClass = maxClass * confidence;
-          if (confidenceInClass > 0.01) {
+          if (confidenceInClass > 0.01 && confidenceInClass != 0.25) {
             LOGGER.i(
                     "%s (%d) %f %s", LABELS[detectedClass], detectedClass, confidenceInClass, rect);
-            pf2_pq.add(new Recognition("" + offset, LABELS[detectedClass], confidenceInClass, rect)); //为priority queue写进PF2_output结果
+            pq.add(new Recognition("" + offset, LABELS[detectedClass], confidenceInClass, rect)); //为priority queue写进PF2_output结果
           }
         }
       }
@@ -335,17 +344,82 @@ private static final String[] LABELS = {
 
     timer.endSplit("decoded results");
 
-    final ArrayList<Recognition> recognitionsTEMP2 = new ArrayList<Recognition>();
-    for (int i = 0; i < Math.min(pf2_pq.size(), MAX_RESULTS); ++i) {
-      recognitionsTEMP2.add(pf2_pq.poll());
+    //过滤两个PF层的输出
+    List<Recognition> pq_results = new ArrayList<Recognition>();
+    int size_re = pq.size();
+    for(int i = 0; i < Math.min(size_re, MAX_RESULTS * 2); i++){
+        pq_results.add(pq.poll());
     }
-    recognitions.add(recognitionsTEMP2);
+    float Iou;
+    for(int i = 0; i < pq_results.size(); i++){
+        for(int j = i + 1; j < pq_results.size(); j++){
+            if(pq_results.get(i).getTitle() == pq_results.get(j).getTitle()){
+                Iou = Iou_Calculation(pq_results.get(i).getLocation(),pq_results.get(j).getLocation());
+                if(Iou < Iou_thread)
+                    //虽然title相同但IOU低于thread，不作处理
+                    continue;
+                else
+                    if(pq_results.get(i).getConfidence() > pq_results.get(j).getConfidence()){
+                        //相同title抛弃低confidence的那一项j
+                        pq_results.remove(j);
+                        j--;} //将j的值退一位，从list中相同位置继续遍历
+                    else {
+                        //相同title抛弃低confidence的那一项i
+                        pq_results.remove(i);
+                        i--;
+                        j = 0;} //重置j，重新开始遍历
+            }
+            else
+                continue;
+        }
+    }
+   for (int i = 0; i < Math.min(pq_results.size(), MAX_RESULTS); i++) {
+       recognitions.add(pq_results.get(i));
+   }
+              //final ArrayList<Recognition> recognitionsTEMP2 = new ArrayList<Recognition>();
+   // for (int i = 0; i < Math.min(pq.size(), MAX_RESULTS); ++i) {
+   //     recognitions.add(pq.poll());
+   // }
+   // recognitions.add(recognitionsTEMP2);
 
     Trace.endSection(); // "recognizeImage"
 
     timer.endSplit("processed results");
 
     return recognitions;
+  }
+
+  private static float Iou_Calculation(RectF s1, RectF s2){
+      float iou;
+      if(!s1.intersect(s2))
+          return 0;
+
+      float union;
+      if(s1.left > s2.left) {
+          if (s1.top > s2.top) {
+              union = s1.height() * s1.width() + s2.height() * s2.width() - (s2.right - s1.left) * (s2.bottom - s1.top);
+              iou = (s2.right - s1.left) * (s2.bottom - s1.top) / union;
+              return iou;
+          }
+          else{
+              union = s1.height() * s1.width() + s2.height() * s2.width() - (s2.right - s1.left) * (s1.bottom - s2.top);
+              iou = (s2.right - s1.left) * (s1.bottom - s2.top) / union;
+              return iou;
+          }
+      }
+      else
+          if (s1.top > s2.top){
+              union = s1.height() * s1.width() + s2.height() * s2.width() - (s1.right - s2.left) * (s2.bottom - s1.top);
+              iou = (s1.right - s2.left) * (s2.bottom - s1.top) / union;
+              return iou;
+          }
+
+          else{
+              union = s1.height() * s1.width() + s2.height() * s2.width() - (s1.right - s2.left) * (s1.bottom - s2.top);
+              iou = (s1.right - s2.left) * (s1.bottom - s2.top) / union;
+              return iou;
+          }
+
   }
 
   @Override

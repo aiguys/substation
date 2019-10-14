@@ -43,7 +43,7 @@ import org.tensorflow.demo.env.ImageUtils;
 import org.tensorflow.demo.env.Logger;
 import org.tensorflow.demo.tracking.MultiBoxTracker;
 import org.tensorflow.demo.R; // Explicit import needed for internal Google builds.
-
+import org.tensorflow.TensorFlow;
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
  * objects.
@@ -51,30 +51,15 @@ import org.tensorflow.demo.R; // Explicit import needed for internal Google buil
 public class DetectorActivity extends CameraActivity implements OnImageAvailableListener {
   private static final Logger LOGGER = new Logger();
 
-  // Configuration values for the prepackaged multibox model.
-  private static final int MB_INPUT_SIZE = 224;
-  private static final int MB_IMAGE_MEAN = 128;
-  private static final float MB_IMAGE_STD = 128;
-  private static final String MB_INPUT_NAME = "ResizeBilinear";
-  private static final String MB_OUTPUT_LOCATIONS_NAME = "output_locations/Reshape";
-  private static final String MB_OUTPUT_SCORES_NAME = "output_scores/Reshape";
-  private static final String MB_MODEL_FILE = "file:///android_asset/multibox_model.pb";
-  private static final String MB_LOCATION_FILE =
-      "file:///android_asset/multibox_location_priors.txt";
-
-  private static final int TF_OD_API_INPUT_SIZE = 300;
-  private static final String TF_OD_API_MODEL_FILE =
-      "file:///android_asset/ssd_mobilenet_v1_android_export.pb";
-  private static final String TF_OD_API_LABELS_FILE = "file:///android_asset/coco_labels_list.txt";
-
   // Configuration values for tiny-yolo-voc. Note that the graph is not included with TensorFlow and
   // must be manually placed in the assets/ directory by the user.
   // Graphs and models downloaded from http://pjreddie.com/darknet/yolo/ may be converted e.g. via
   // DarkFlow (https://github.com/thtrieu/darkflow). Sample command:
   // ./flow --model cfg/tiny-yolo-voc.cfg --load bin/tiny-yolo-voc.weights --savepb --verbalise
-  private static final String YOLO_MODEL_FILE = "file:///android_asset/ep007.pb"; //   graph-tiny-yolo-voc
+//  private static String v = TensorFlow.version();
+  private static final String YOLO_MODEL_FILE = "file:///android_asset/ep036val_loss16.520.pb"; //   graph-tiny-yolo-voc
   private static final int YOLO_INPUT_SIZE = 416;
-  private static final String YOLO_INPUT_NAME = "input_1";
+  private static final String YOLO_INPUT_NAME = "input_1:0";
   private static final String YOLO_OUTPUT_NAMES = "conv2d_10/BiasAdd:0,conv2d_13/BiasAdd:0";
   private static final int YOLO_PF1_BLOCK_SIZE = 32; //1st perception field，决定了yolo cell的划分，即将416*416的图分成32*32个cells
   private static final int YOLO_PF2_BLOCK_SIZE = 16; //2nd perception field，决定了yolo cell的划分，即将416*416的图分成16*16个cells
@@ -83,14 +68,12 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
   // checkpoints.  Optionally use legacy Multibox (trained using an older version of the API)
   // or YOLO.
   private enum DetectorMode {
-    TF_OD_API, MULTIBOX, YOLO;
+      YOLO;
   }
   private static final DetectorMode MODE = DetectorMode.YOLO;
 
   // Minimum detection confidence to track a detection.
-  private static final float MINIMUM_CONFIDENCE_TF_OD_API = 0.6f;
-  private static final float MINIMUM_CONFIDENCE_MULTIBOX = 0.1f;
-  private static final float MINIMUM_CONFIDENCE_YOLO = 0.25f;
+  private static final float MINIMUM_CONFIDENCE_YOLO = 0.30f;
 
   private static final boolean MAINTAIN_ASPECT = MODE == DetectorMode.YOLO;
 
@@ -122,6 +105,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
   private BorderedText borderedText;
   @Override
   public void onPreviewSizeChosen(final Size size, final int rotation) {
+
     final float textSizePx =
         TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
@@ -130,7 +114,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
 
     tracker = new MultiBoxTracker(this);
 
-    int cropSize = TF_OD_API_INPUT_SIZE;
+    int cropSize = YOLO_INPUT_SIZE;
     if (MODE == DetectorMode.YOLO) {
       detector =
           TensorFlowYoloDetector.create(
@@ -141,7 +125,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
               YOLO_OUTPUT_NAMES,
               YOLO_PF1_BLOCK_SIZE,
               YOLO_PF2_BLOCK_SIZE);
-      cropSize = YOLO_INPUT_SIZE;
+      ;
     }
 
     previewWidth = size.getWidth();
@@ -265,7 +249,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             LOGGER.i("Running detection on image " + currTimestamp);
             final long startTime = SystemClock.uptimeMillis();
             // results have 2 outputs tensor(2 lists) based on yolov3-tiny structure
-            final List<List<Classifier.Recognition>> results = detector.recognizeImage(croppedBitmap);
+            final List<Classifier.Recognition> results = detector.recognizeImage(croppedBitmap);
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
             cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
@@ -275,38 +259,29 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
             paint.setStyle(Style.STROKE);
             paint.setStrokeWidth(2.0f);
 
-            float minimumConfidence = MINIMUM_CONFIDENCE_TF_OD_API;
-            switch (MODE) {
-              case TF_OD_API:
-                minimumConfidence = MINIMUM_CONFIDENCE_TF_OD_API;
-                break;
-              case MULTIBOX:
-                minimumConfidence = MINIMUM_CONFIDENCE_MULTIBOX;
-                break;
-              case YOLO:
-                minimumConfidence = MINIMUM_CONFIDENCE_YOLO;
-                break;
-            }
+            float minimumConfidence = MINIMUM_CONFIDENCE_YOLO;
+
 
             final List<Classifier.Recognition> mappedRecognitions =
                 new LinkedList<Classifier.Recognition>();
 
 
-            List<Classifier.Recognition> resultArray;
-            //while (results.iterator().hasNext()) {
-            for (int i = results.size();i != 0; i--){
-                resultArray = results.iterator().next();
-                for (Classifier.Recognition result : resultArray) {
-                  final RectF location = result.getLocation();
-                  if (location != null && result.getConfidence() >= minimumConfidence) {
-                    canvas.drawRect(location, paint);
+          //  List<Classifier.Recognition> resultArray;
+          //  for (int i = results.size();i != 0; i--){
+          //  resultArray = results.iterator().next();
+            for (Classifier.Recognition result : results) {
+              final RectF location = result.getLocation();
+              if (location != null && result.getConfidence() >= minimumConfidence) {
+                canvas.drawRect(location, paint);
 
-                    cropToFrameTransform.mapRect(location);
-                    result.setLocation(location);
-                    mappedRecognitions.add(result);
-                  }
-                }
+                cropToFrameTransform.mapRect(location);
+                result.setLocation(location);
+                mappedRecognitions.add(result);
+              }
             }
+            //用于清除检测完后遗留的框
+          //  canvas.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
+          //  }
 
             tracker.trackResults(mappedRecognitions, luminanceCopy, currTimestamp);
             trackingOverlay.postInvalidate();
