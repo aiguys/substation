@@ -137,6 +137,8 @@ def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
         feats, [-1, grid_shape[0], grid_shape[1], num_anchors, num_classes + 5])
 
     # Adjust preditions to each spatial grid point and anchor size.
+   # f_t = feats[..., :2]
+   # g_t = grid_shape[::-1]
     box_xy = (K.sigmoid(feats[..., :2]) + grid) / K.cast(grid_shape[::-1], K.dtype(feats))
     box_wh = K.exp(feats[..., 2:4]) * anchors_tensor / K.cast(input_shape[::-1], K.dtype(feats))
     box_confidence = K.sigmoid(feats[..., 4:5])
@@ -156,6 +158,7 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
     new_shape = K.round(image_shape * K.min(input_shape/image_shape))
     offset = (input_shape-new_shape)/2./input_shape
     scale = input_shape/new_shape
+
     box_yx = (box_yx - offset) * scale
     box_hw *= scale
 
@@ -198,7 +201,7 @@ def yolo_eval(yolo_outputs,
     boxes = []
     box_scores = []
     for l in range(num_layers):
-        _boxes, _box_scores = yolo_boxes_and_scores(yolo_outputs[l],
+        _boxes, _box_scores = yolo_boxes_and_scores(yolo_outputs[l], # get all output layers‘ scores and boxes one by one
             anchors[anchor_mask[l]], num_classes, input_shape, image_shape)
         boxes.append(_boxes)
         box_scores.append(_box_scores)
@@ -368,7 +371,7 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=.5, print_loss=False):
     m = K.shape(yolo_outputs[0])[0] # batch size, tensor
     mf = K.cast(m, K.dtype(yolo_outputs[0]))
 
-    for l in range(num_layers):
+    for l in range(num_layers): #tiny 2 layers, yolov3 3 layers
         object_mask = y_true[l][..., 4:5]
         true_class_probs = y_true[l][..., 5:]
 

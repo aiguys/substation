@@ -10,7 +10,8 @@ tflite_convert --output_file=./model_data/tf.tflite \
 input_shape是和input_arrays对应。查看这些模型参数可以到 tensorflow目录下
 到lite.py中print 模型的input和output tensor_name信息，我的目录地址
 D:\Anaconda\envs\tfenv\Lib\site-packages\tensorflow\lite\python\lite.py
-在方法from_keras_model_file（）下，764行左右添加print语句查看，设断点查看tensor_name.
+在model.py中调试模式下查看方法
+197行左右查看，设断点查看output tensor的名字
 
 
 tflite_convert --output_file=./model_data/yolo-tiny-quan.tflite \

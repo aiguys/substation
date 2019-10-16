@@ -6,7 +6,7 @@ import time
 import os
 
 def detect_img(yolo):
-   # ''''
+    ''''
     while True:
         img = input('Input image filename:')
         try:
@@ -43,7 +43,7 @@ def detect_img(yolo):
             yolo.detect_image(image,list_file)
             elapsed = (time.clock() - start)
             print("Time used:", elapsed)
-    '''''
+    #'''''
     yolo.close_session()
 
 FLAGS = None
@@ -105,3 +105,4 @@ if __name__ == '__main__':
         detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
     else:
         print("Must specify at least video_input_path.  See usage with --help.")
+

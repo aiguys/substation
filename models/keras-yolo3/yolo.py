@@ -20,7 +20,7 @@ from keras.utils import multi_gpu_model
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'logs\\000\ep062-loss21.860-val_loss17.623.h5', # 000: ep062-loss21.860-val_loss17.623 001:ep034-loss23.645-val_loss17.370
+        "model_path": 'model_data\ep036-loss21.932-val_loss16.520.h5', # 000: ep062-loss21.860-val_loss17.623 001:ep034-loss23.645-val_loss17.370
         "anchors_path": 'cfg\\tiny_yolo_anchors.txt', # \t需要\\t进行转义
         "classes_path": 'cfg\hat_classes.txt',
         "score" : 0.3,
@@ -99,8 +99,8 @@ class YOLO(object):
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
-    def detect_image(self, image): # add parameter 'list_file' here to test on all images and write the results down
-
+    #def detect_image(self, image): # add parameter 'list_file' here to test on all images and write the results down
+    def detect_image(self, image,list_file): # if parameter 'list_file' is not used, comment line 151
         if self.model_image_size != (None, None):
             assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
             assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
@@ -148,7 +148,7 @@ class YOLO(object):
             start to write detect results down in txt files. Format as '<class_name> <confidence> <left> <top> <right> <bottom>'
             eg. bottle 0.287150 336 231 376 305
             '''''
-        #    list_file.write(str(label) + " " + str(left) + " " + str(top) + " " + str(right) + " " + str(bottom) + '\n')
+            list_file.write(str(label) + " " + str(left) + " " + str(top) + " " + str(right) + " " + str(bottom) + '\n')
 
             ''''            ******分割线*******  '''''
 

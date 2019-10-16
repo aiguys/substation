@@ -6,6 +6,7 @@ import os.path as osp
 from keras import backend as K
 from keras.layers import Input
 from tensorflow.python.framework import graph_util,graph_io
+from keras.backend import clear_session
 
 import sys
 sys.path.append("..")
@@ -13,8 +14,8 @@ from yolo3.model import preprocess_true_boxes, yolo_body, tiny_yolo_body, yolo_l
 from train import create_tiny_model,get_classes,get_anchors,create_model
 #路径参数
 #input_path = '/home/jtl/keras-yolo3-master/h5_to_pb/'
-weight_file = 'ep007-loss33.746-val_loss28.975.h5'
-weight_file_path = 'D:\GitHub_Repository\substation\models\keras-yolo3\model_data\ep007-loss33.746-val_loss28.975.h5' # yolov3-tiny4hat.h5
+weight_file = 'ep036val_loss16.520.h5'
+weight_file_path = 'D:\GitHub_Repository\keras-yolo3\\logs\\000\ep036-loss21.932-val_loss16.520.h5' # yolov3-tiny4hat.h5
 
 output_graph_name = weight_file[:-3] + '.pb'
 
@@ -56,9 +57,26 @@ if __name__ == '__main__':
     # load_weights用于加载keras框架外用户自定义的模型框架的权重
     h5_model.load_weights(weight_file_path)
     # load_model用于加载keras框架内定义的模型框架的权重
-    # h5_model = load_model(weight_file_path)
+    ## h5_model = load_model(weight_file_path)
     h5_to_pb(h5_model,output_dir = output_dir,model_name = output_graph_name)
     print('model saved')
+
+    ''' # 查看keras模型的输入、输出tensor名字
+    clear_session()
+    np.set_printoptions(suppress=True)
+    image_input = Input(shape=(None, None, 3))
+    num_anchors = len(anchors)
+    input_graph_name = "model_data\ep036-loss21.932-val_loss16.520.h5"
+    output_graph_name = weight_file_path[:-3] + '.tflite'
+    h5_model = tiny_yolo_body(image_input, num_anchors // 2, num_classes)
+    h5_model.load_weights(input_graph_name)
+    converter = tf.lite.TFLiteConverter.from_keras_model_file(model_file=h5_model, Custom=True)
+    converter.post_training_quantize = True
+    # 在windows平台这个函数有问题，无法正常使用
+    tflite_model = converter.convert()
+    open(output_graph_name, "wb").write(tflite_model)
+    print ("generate:", output_graph_name)
+    '''
 
 
 
