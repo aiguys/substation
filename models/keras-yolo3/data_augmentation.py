@@ -21,8 +21,8 @@ def augmentation(images):
     seq = iaa.Sequential(
         [
             # apply the following augmenters to most images
-            iaa.Fliplr(0.6), # horizontally flip 50% of all images
-            iaa.Flipud(0.2), # vertically flip 20% of all images
+            #iaa.Fliplr(0.6), # horizontally flip 50% of all images
+            #iaa.Flipud(0.2), # vertically flip 20% of all images
 
             # execute 0 to 5 of the following (less important) augmenters per image
             # don't execute all of them, as that would often be way too strong
@@ -35,10 +35,10 @@ def augmentation(images):
                     iaa.Emboss(alpha=(0, 1.0), strength=(0, 2.0)), # emboss images
                     # search either for all edges or for directed edges,
                     # blend the result with the original image using a blobby mask
-                    iaa.SimplexNoiseAlpha(iaa.OneOf([
-                        iaa.EdgeDetect(alpha=(0.5, 1.0)),
-                        iaa.DirectedEdgeDetect(alpha=(0.5, 1.0), direction=(0.0, 1.0)),
-                    ])),
+                    #iaa.SimplexNoiseAlpha(iaa.OneOf([
+                    #    iaa.EdgeDetect(alpha=(0.5, 1.0)),
+                    #    iaa.DirectedEdgeDetect(alpha=(0.5, 1.0), direction=(0.0, 1.0)),
+                   # ])),
                     iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5), # add gaussian noise to images
                     iaa.OneOf([
                         iaa.Dropout((0.01, 0.1), per_channel=0.5), # randomly remove up to 10% of the pixels
@@ -50,15 +50,15 @@ def augmentation(images):
                     # either change the brightness of the whole image (sometimes
                     # per channel) or change the brightness of subareas
                     iaa.OneOf([
-                        iaa.Multiply((0.85, 1.25), per_channel=0.5),
+                        iaa.Multiply((0.9, 1.1), per_channel=0.5),
                         iaa.FrequencyNoiseAlpha(
-                            exponent=(-4, 0),
-                            first=iaa.Multiply((0.85, 1.25), per_channel=True),
-                            second=iaa.LinearContrast((0.5, 2.0))
+                            exponent=(-1, 1),
+                            first=iaa.Multiply((0.9, 1.1), per_channel=True),
+                            second=iaa.LinearContrast((0.8, 1.5))
                         )
                     ]),
-                    iaa.LinearContrast((0.5, 2.0), per_channel=0.5), # improve or worsen the contrast
-                    sometimes(iaa.ElasticTransformation(alpha=(0.75, 1.25), sigma=0.25)), # move pixels locally around (with random strengths)
+                    iaa.LinearContrast((0.8, 1.5), per_channel=0.5), # improve or worsen the contrast
+                    sometimes(iaa.ElasticTransformation(alpha=(0.15, 0.75), sigma=0.25)), # move pixels locally around (with random strengths)
                     sometimes(iaa.PiecewiseAffine(scale=(0.01, 0.015))), # sometimes move parts of the image around
                     #sometimes(iaa.PerspectiveTransform(scale=(0.01, 0.1)))
                 ],
