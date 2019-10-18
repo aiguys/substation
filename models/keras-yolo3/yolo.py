@@ -20,7 +20,7 @@ from keras.utils import multi_gpu_model
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'model_data\ep036-loss21.932-val_loss16.520.h5', # 000: ep062-loss21.860-val_loss17.623 001:ep034-loss23.645-val_loss17.370
+        "model_path": 'logs\\000\ep062-loss21.860-val_loss17.623.h5', # 000: ep062-loss21.860-val_loss17.623 001:ep034-loss23.645-val_loss17.370
         "anchors_path": 'cfg\\tiny_yolo_anchors.txt', # \t需要\\t进行转义
         "classes_path": 'cfg\hat_classes.txt',
         "score" : 0.3,
@@ -99,8 +99,8 @@ class YOLO(object):
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
-    #def detect_image(self, image): # add parameter 'list_file' here to test on all images and write the results down
-    def detect_image(self, image,list_file): # if parameter 'list_file' is not used, comment line 151
+    def detect_image(self, image,list_file): # add parameter 'list_file' here to test on all images and write the results down
+
         if self.model_image_size != (None, None):
             assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
             assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
@@ -112,7 +112,7 @@ class YOLO(object):
         image_data = np.array(boxed_image, dtype='float32')
 
         print(image_data.shape)
-        image_data /= 255.
+        image_data /= 255. # normalize pixel value
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
 
         out_boxes, out_scores, out_classes = self.sess.run(
@@ -159,6 +159,7 @@ class YOLO(object):
             else:
                 text_origin = np.array([left, top + 1])
 
+            '''''
             # My kingdom for a good redistributable image drawing library.
             for i in range(thickness):
                 draw.rectangle(
@@ -169,7 +170,8 @@ class YOLO(object):
                 fill=self.colors[c])
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
-          #  '''''
+
+            '''''
 
 
         return image

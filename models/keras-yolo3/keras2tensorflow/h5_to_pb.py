@@ -11,8 +11,8 @@ from yolo3.model import preprocess_true_boxes, yolo_body, tiny_yolo_body, yolo_l
 from train import create_tiny_model,get_classes,get_anchors,create_model
 #路径参数
 #input_path = '/home/jtl/keras-yolo3-master/h5_to_pb/'
-weight_file = 'ep007-loss33.746-val_loss28.975.h5'
-weight_file_path = 'D:\GitHub_Repository\substation\models\keras-yolo3\logs\\000\ep007-loss33.746-val_loss28.975.h5' # yolov3-tiny4hat.h5
+weight_file = 'ep036-loss21.932-val_loss16.520.h5'
+weight_file_path = 'D:\GitHub_Repository\substation\models\keras-yolo3\logs\\000\ep036-loss21.932-val_loss16.520.h5' # yolov3-tiny4hat.h5
 
 output_graph_name = weight_file[:-3] + '.pb'
 

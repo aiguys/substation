@@ -28,14 +28,14 @@ def _main():
     if is_tiny_version:
         model = create_tiny_model(input_shape, anchors, num_classes,
             #freeze_body=2, weights_path='model_data/yolo-tiny.h5')
-            freeze_body=2, weights_path='logs/000/ep018-loss28.307-val_loss28.648.h5')
+            freeze_body=2, weights_path='logs/000/ep013-loss28.923-val_loss17.314.h5')
     else:
         model = create_model(input_shape, anchors, num_classes,
             freeze_body=2, weights_path='model_data/yolo_weights.h5') # make sure you know what you freeze
 
     logging = TensorBoard(log_dir=log_dir)
     checkpoint = ModelCheckpoint(log_dir + 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5',
-        monitor='val_loss', save_weights_only=False, save_best_only=True, period=1)# 每3个echo保存一次最好的模型
+        monitor='val_loss', save_weights_only=True, save_best_only=True, period=3)# 每3个echo保存一次最好的模型
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, verbose=1)
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1)
 
@@ -50,7 +50,7 @@ def _main():
 
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
-    #'''训练最后两层（已完成该stage one）
+    '''训练最后两层（已完成该stage one）
     if True:
         model.compile(optimizer=Adam(lr=1e-2), loss={
             # use custom yolo_loss Lambda layer.
@@ -63,11 +63,11 @@ def _main():
                 steps_per_epoch=max(1, num_train//batch_size),
                 validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
                 validation_steps=max(1, num_val//batch_size),
-                epochs=30,
-                initial_epoch=28,
+                epochs=6,
+                initial_epoch=0,
                 callbacks=[logging, checkpoint])
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
-    #'''
+    '''
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
     if True:

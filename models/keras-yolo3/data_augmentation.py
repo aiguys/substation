@@ -30,7 +30,7 @@ def augmentation(images):
                 [
                     #sometimes(iaa.Superpixels(p_replace=(0, 0.05), n_segments=(175, 200))), # convert images into their superpixel representation
 
-                    iaa.GaussianBlur((0, 2.5)), # blur images with a sigma between 0 and 3.0
+                    iaa.GaussianBlur((0, 3.5)), # blur images with a sigma between 0 and 3.0
                     iaa.Sharpen(alpha=(0, 1.0), lightness=(0.75, 1.5)), # sharpen images
                     iaa.Emboss(alpha=(0, 1.0), strength=(0, 2.0)), # emboss images
                     # search either for all edges or for directed edges,
@@ -39,10 +39,10 @@ def augmentation(images):
                     #    iaa.EdgeDetect(alpha=(0.5, 1.0)),
                     #    iaa.DirectedEdgeDetect(alpha=(0.5, 1.0), direction=(0.0, 1.0)),
                    # ])),
-                    iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5), # add gaussian noise to images
+                    iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.08*255), per_channel=0.5), # add gaussian noise to images
                     iaa.OneOf([
-                        iaa.Dropout((0.01, 0.1), per_channel=0.5), # randomly remove up to 10% of the pixels
-                        iaa.CoarseDropout((0.03, 0.15), size_percent=(0.02, 0.05), per_channel=0.2),
+                        iaa.Dropout((0.01, 0.02), per_channel=0.5), # randomly remove up to 10% of the pixels
+                      #  iaa.CoarseDropout((0.03, 0.15), size_percent=(0.02, 0.05), per_channel=0.2),
                     ]),
 
                     iaa.Add((-10, 10), per_channel=0.5), # change brightness of images (by -10 to 10 of original value)
@@ -73,8 +73,8 @@ def augmentation(images):
 def get_image(line):
     line = line.split()
     img = line[0]
-    image = cv2.imread(img, 1)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.imread(img,1)
+    #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     #image = imageio.imread(img)
     name = img.split("\\")[5]
     return image, name
@@ -121,6 +121,7 @@ if __name__ == '__main__':
         while j < len :
             output_img = aug_imgs[j]
             name = image_name[j]
+            #output_img = cv2.cvtColor(output_img, cv2.COLOR_RGB2BGR)
             cv2.imwrite(output_dir + name , output_img)
             print("saving image:" + name)
             j += 1
