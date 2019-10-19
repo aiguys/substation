@@ -1,0 +1,7 @@
+person 65 132 83 154
+person 32 127 46 138
+person 44 123 57 140
+person 26 141 44 164
+person 84 116 109 143
+person 167 85 184 103
+person 211 77 229 93

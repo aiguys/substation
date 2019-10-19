@@ -1,0 +1,6 @@
+person 335 58 349 72
+person 357 62 368 77
+person 417 53 435 73
+person 465 35 476 49
+person 464 82 477 95
+person 510 84 522 104
