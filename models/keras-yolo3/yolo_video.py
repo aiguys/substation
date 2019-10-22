@@ -6,7 +6,7 @@ import time
 import os
 
 def detect_img(yolo):
-    '''''
+    #'''''
     while True:
         img = input('Input image filename:')
         try:
@@ -21,7 +21,7 @@ def detect_img(yolo):
             elapsed = (time.clock() - start)
             print("Time used:", elapsed)
             r_image.show()
-    '''''
+   # '''''
 
     wd = 'D:\GitHub_Repository\Data\VOC2028Helmet'
 

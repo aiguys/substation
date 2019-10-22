@@ -19,7 +19,7 @@ def _main():
     train_path = 'train.txt'
     log_dir = 'logs/Mobilenet_finetune/'
     classes_path = 'model_data/hat_classes.txt'
-    anchors_path = 'model_data/yolo_anchors.txt'
+    anchors_path = 'model_data/tiny_yolo_anchors.txt'
     class_names = get_classes(classes_path)
     num_classes = len(class_names)
     anchors = get_anchors(anchors_path)
@@ -28,7 +28,8 @@ def _main():
 
     is_tiny_version = len(anchors) == 6 # 判断是否使用tiny yolo anchors
     if is_tiny_version:
-        model = create_tiny_model(input_shape, anchors, num_classes,
+        model = create_tiny_model(input_shape, anchors, num_classes,load_pretrained=True,
+                    weights_path='model_data/yolo-tiny.h5',
             freeze_body=2)
     else:
         model = create_model(input_shape, anchors, num_classes,load_pretrained=True,
@@ -52,21 +53,21 @@ def _main():
 
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
-  #  if True:
-  #      model.compile(optimizer=Adam(lr=1e-3), loss={
+    if True:
+        model.compile(optimizer=Adam(lr=1e-3), loss={
             # use custom yolo_loss Lambda layer.
-  #          'yolo_loss': lambda y_true, y_pred: y_pred})
+            'yolo_loss': lambda y_true, y_pred: y_pred})
 
-  #      batch_size = 32
-   #     print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
-   #     model.fit_generator(data_generator_wrapper(t_lines[:num_train], batch_size, input_shape, anchors, num_classes),
-  #              steps_per_epoch=max(1, num_train//batch_size),
-  #              validation_data=data_generator_wrapper(t_lines[num_train:], batch_size, input_shape, anchors, num_classes),
-  #              validation_steps=max(1, num_val//batch_size),
-  #              epochs=23,
-  #              initial_epoch=3,
-  #              callbacks=[logging, checkpoint])
-  #      model.save_weights(log_dir + 'trained_weights_stage_1.h5')
+        batch_size = 16
+        print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
+        model.fit_generator(data_generator_wrapper(t_lines[:num_train], batch_size, input_shape, anchors, num_classes),
+                steps_per_epoch=max(1, num_train//batch_size),
+                validation_data=data_generator_wrapper(t_lines[num_train:], batch_size, input_shape, anchors, num_classes),
+                validation_steps=max(1, num_val//batch_size),
+                epochs=20,
+                initial_epoch=0,
+                callbacks=[logging, checkpoint])
+        model.save_weights(log_dir + 'trained_weights_stage_1.h5')
 
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
@@ -75,14 +76,14 @@ def _main():
         for i in range(len(model.layers)):
             model.layers[i].trainable= True
         model.compile(optimizer=Adam(lr=1e-4), loss={'yolo_loss': lambda y_true, y_pred: y_pred}) # recompile to apply the change
-        batch_size = 16 # note that more GPU memory is required after unfreezing the body
+        batch_size = 8 # note that more GPU memory is required after unfreezing the body
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
         model.fit_generator(data_generator_wrapper(t_lines[:num_train], batch_size, input_shape, anchors, num_classes),
             steps_per_epoch=max(1, num_train//batch_size),
             validation_data=data_generator_wrapper(t_lines[num_train:], batch_size, input_shape, anchors, num_classes),
             validation_steps=max(1, num_val//batch_size),
-            epochs=33,
-            initial_epoch=27,
+            epochs=40,
+            initial_epoch=20,
             callbacks=[logging, checkpoint, reduce_lr, early_stopping])
         model.save_weights(log_dir + 'trained_weights_final.h5')
 

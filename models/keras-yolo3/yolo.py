@@ -20,10 +20,10 @@ from keras.utils import multi_gpu_model
 
 class YOLO(object):
     _defaults = {
-        "model_path": 'logs\\000\ep062-loss21.860-val_loss17.623.h5', # 000: ep062-loss21.860-val_loss17.623 001:ep034-loss23.645-val_loss17.370
-        "anchors_path": 'cfg\\tiny_yolo_anchors.txt', # \t需要\\t进行转义
+        "model_path": 'logs\\000\\trained_weights_stage_1.h5', # 000: ep062-loss21.860-val_loss17.623 001:ep034-loss23.645-val_loss17.370
+        "anchors_path": 'cfg\\yolo_anchors.txt', # \t需要\\t进行转义
         "classes_path": 'cfg\hat_classes.txt',
-        "score" : 0.3,
+        "score" : 0.1,
         "iou" : 0.45,
         "model_image_size" : (416, 416),
         "gpu_num" : 1,
@@ -99,7 +99,7 @@ class YOLO(object):
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
-    def detect_image(self, image,list_file): # add parameter 'list_file' here to test on all images and write the results down
+    def detect_image(self, image): # add parameter 'list_file' here to test on all images and write the results down
 
         if self.model_image_size != (None, None):
             assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
@@ -148,7 +148,7 @@ class YOLO(object):
             start to write detect results down in txt files. Format as '<class_name> <confidence> <left> <top> <right> <bottom>'
             eg. bottle 0.287150 336 231 376 305
             '''''
-            list_file.write(str(label) + " " + str(left) + " " + str(top) + " " + str(right) + " " + str(bottom) + '\n')
+            #list_file.write(str(label) + " " + str(left) + " " + str(top) + " " + str(right) + " " + str(bottom) + '\n')
 
             ''''            ******分割线*******  '''''
 
@@ -159,7 +159,7 @@ class YOLO(object):
             else:
                 text_origin = np.array([left, top + 1])
 
-            '''''
+            #'''''
             # My kingdom for a good redistributable image drawing library.
             for i in range(thickness):
                 draw.rectangle(
@@ -171,7 +171,7 @@ class YOLO(object):
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
 
-            '''''
+            #'''''
 
 
         return image
