@@ -254,9 +254,15 @@ def draw_plot_func(dictionary, n_classes, window_title, plot_title, x_label, out
         """
         fp_sorted = []
         tp_sorted = []
+        tp_sum, fp_sum =0,0
+        num_hat = gt_counter_per_class['hat']
+        num_person = gt_counter_per_class['person']
         for key in sorted_keys:
             fp_sorted.append(dictionary[key] - true_p_bar[key])
             tp_sorted.append(true_p_bar[key])
+            tp_sum = tp_sum + true_p_bar[key]
+            fp_sum = fp_sum + (dictionary[key] - true_p_bar[key])
+            prec_overal = round(tp_sum / (tp_sum + fp_sum),2)
         plt.barh(range(n_classes), fp_sorted, align='center', color='crimson', label='False Positive')
         plt.barh(range(n_classes), tp_sorted, align='center', color='forestgreen', label='True Positive', left=fp_sorted)
         # add legend
@@ -278,6 +284,15 @@ def draw_plot_func(dictionary, n_classes, window_title, plot_title, x_label, out
             plt.text(val, i, fp_str_val, color='crimson', va='center', fontweight='bold')
             if i == (len(sorted_values)-1): # largest bar
                 adjust_axes(r, t, fig, axes)
+            # calculate precision and recall rate for every class
+            #fp = round(fp_val / (fp_val + tp_val),2)
+            tp = round(tp_val / (fp_val + tp_val),2)
+            if i == 1:
+                recall_class = round(tp_val / num_person, 2)
+            elif i ==0 :
+                recall_class = round(tp_val / num_hat, 2)
+            plt.text(val, i-0.2, r'Recall=%s Precisioion=%s' % (recall_class, tp), color = 'forestgreen',fontweight='bold')
+            plt.text(val, i-0.2, r'Recall=%s' % recall_class, color='crimson', fontweight='bold')
     else:
         plt.barh(range(n_classes), sorted_values, color=plot_color)
         """
@@ -294,6 +309,7 @@ def draw_plot_func(dictionary, n_classes, window_title, plot_title, x_label, out
             # re-set axes to show number inside the figure
             if i == (len(sorted_values)-1): # largest bar
                 adjust_axes(r, t, fig, axes)
+
     # set window title
     fig.canvas.set_window_title(window_title)
     # write classes in y axis
@@ -315,8 +331,12 @@ def draw_plot_func(dictionary, n_classes, window_title, plot_title, x_label, out
     if figure_height > init_height:
         fig.set_figheight(figure_height)
 
-    # set plot title
-    plt.title(plot_title, fontsize=14)
+    if true_p_bar != "":
+        # set plot title
+        plt.title(plot_title + "\n" + "overall precision" + str(prec_overal), fontsize=14)
+    else:
+        # set plot title
+        plt.title(plot_title, fontsize=14)
     # set axis titles
     # plt.xlabel('classes')
     plt.xlabel(x_label, fontsize='large')
@@ -691,7 +711,8 @@ with open(results_files_path + "/results.txt", 'w') as results_file:
          Draw plot
         """
         if draw_plot:
-            plt.plot(rec, prec, '-o')
+
+            plt.plot(rec, prec, '-o',marker='o')
             # add a new penultimate point to the list (mrec[-2], 0.0)
             # since the last line segment (and respective area) do not affect the AP value
             area_under_curve_x = mrec[:-1] + [mrec[-2]] + [mrec[-1]]
@@ -713,10 +734,44 @@ with open(results_files_path + "/results.txt", 'w') as results_file:
             # Alternative option -> wait for button to be pressed
             #while not plt.waitforbuttonpress(): pass # wait for key display
             # Alternative option -> normal display
-            #plt.show()
+           # plt.show()
             # save the plot
             fig.savefig(results_files_path + "/classes/" + class_name + ".png")
             plt.cla() # clear axes for next plot
+
+
+            # additional plot
+            #fig = plt.figure()
+            # 画图（点图）
+            # set window title
+
+            fig = plt.gcf() # gcf - get current figure
+            fig.canvas.set_window_title('scores_PR_Curve class: ' + text)
+            # set plot title
+            plt.title('scores_PR_Curve class: ' + text)
+            # fig, ax = plt.subplots()
+            recall = [mrec[0],mrec[110],mrec[220],mrec[330],mrec[440],mrec[550],mrec[660],mrec[770],mrec[880],mrec[990],mrec[1100]]
+            precision = [mprec[0], mprec[110], mprec[220], mprec[330], mprec[440], mprec[550], mprec[660], mprec[770], mprec[880], mprec[990], mprec[1100]]
+            scores = [0.99, 0.91, 0.83, 0.75, 0.66, 0.58, 0.49, 0.41, 0.32, 0.24, 0.15] #[0.99, 0.91, 0.83, 0.75, 0.66, 0.58, 0.49, 0.41, 0.32, 0.24, 0.15]
+
+            #ax = fig.plot()
+            plt.plot(recall, precision)
+            #plt.plot(recall, precision, label='weight changes', linewidth=3, color='r', marker='o',
+            #         markerfacecolor='blue', markersize=20)
+            #for a, b in zip(recall, scores):
+            #    plt.text(a, b, b, ha='center', va='bottom', fontsize=20)
+            i = 0
+            for xy in zip(recall, precision):
+                plt.annotate("(%s)" % scores[i], xy, xytext=(-20, 10), textcoords='offset points')
+                i = i + 1
+            plt.xlabel('recall')
+            plt.ylabel('precision')
+
+            # save the plot
+            #plt.show()
+            fig.savefig(results_files_path + "/classes/scores_PR_Curve"  + class_name + ".png")
+            plt.cla()  # clear axes for next plot
+
 
     if show_animation:
         cv2.destroyAllWindows()
