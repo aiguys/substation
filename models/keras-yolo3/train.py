@@ -41,7 +41,7 @@ def _main():
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, verbose=1)
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1)
 
-    val_split = 0.1
+    val_split = 0.2
     with open(annotation_path) as f:
         lines = f.readlines()  # Lines 是读进来的train.txt文件中所有rows image地址及box信息数据
     np.random.seed(10101)
@@ -54,6 +54,7 @@ def _main():
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
     '''训练最后两层（已完成该stage one）
     if True:
+        # options for optimizer: Adadelta, Adagrad
         model.compile(optimizer=Adam(lr=1e-3), loss={
             # use custom yolo_loss Lambda layer.
             'yolo_loss': lambda y_true, y_pred: y_pred})

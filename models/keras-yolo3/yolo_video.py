@@ -5,8 +5,9 @@ from PIL import Image
 import time
 import os
 
+
 def detect_img(yolo):
-    #'''''
+    # ''''
     while True:
         img = input('Input image filename:')
         try:
@@ -21,30 +22,35 @@ def detect_img(yolo):
             elapsed = (time.clock() - start)
             print("Time used:", elapsed)
             r_image.show()
-   # '''''
 
-    wd = 'D:\GitHub_Repository\Data\VOC2028Helmet'
+    yolo.close_session()
 
-    if not os.path.exists(wd + '\ImageSets\detection-results'):
-        os.makedirs(wd + '\ImageSets\detection-results')
+
+def detect_multi_img(yolo):
+    imgid_wd = 'D:\GitHub_Repository\Data\VOC2028Helmet'
+    wd = os.getcwd()
+
+    if not os.path.exists(wd + '\detection-results'):
+        os.makedirs(wd + '\detection-results')
     image_ids = open(
         'D:\GitHub_Repository\Data\VOC2028Helmet\ImageSets\Main\%s.txt' % ('test')).read().strip().split()
     for image_id in image_ids:
         try:
-            #print(wd + '\JPEGImages\\' + image_id)
-            image = Image.open(wd + '\JPEGImages\\%s.jpg'  %(image_id))
+            # print(wd + '\JPEGImages\\' + image_id)
+            image = Image.open(imgid_wd + '\JPEGImages\\%s.jpg' % (image_id))
         except:
             print('Open Error!' + image_id)
             break
         else:
-            list_file = open(wd + '\ImageSets\detection-results\%s.txt' % (image_id), 'w')  # 以写模式为每一张image创建txt文件
+            list_file = open(wd + '\detection-results\%s.txt' % (image_id), 'w')  # 以写模式为每一张image创建txt文件
             start = time.clock()
             print("Inference and processing on " + image_id)
-            yolo.detect_image(image,list_file)
+            yolo.detect_image(image, list_file)
             elapsed = (time.clock() - start)
             print("Time used:", elapsed)
 
     yolo.close_session()
+
 
 FLAGS = None
 
@@ -78,17 +84,21 @@ if __name__ == '__main__':
         '--image', default=False, action="store_true",
         help='Image detection mode, will ignore all positional arguments'
     )
+    parser.add_argument(
+        '--multiMode', default=False, action="store_true",
+        help='Image detection mode with multiple imgs detection results file generation'
+    )
     '''
     Command line positional arguments -- for video detection mode
     '''
     parser.add_argument(
-        "--input", nargs='?', type=str,required=False,default='./path2your_video',
-        help = "Video input path"
+        "--input", nargs='?', type=str, required=False, default='./path2your_video',
+        help="Video input path"
     )
 
     parser.add_argument(
         "--output", nargs='?', type=str, default="",
-        help = "[Optional] Video output path"
+        help="[Optional] Video output path"
     )
 
     FLAGS = parser.parse_args()
@@ -100,7 +110,10 @@ if __name__ == '__main__':
         print("Image detection mode")
         if "input" in FLAGS:
             print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
-        detect_img(YOLO(**vars(FLAGS)))
+        if FLAGS.multiMode:
+            detect_multi_img(YOLO(**vars(FLAGS)))
+        else:
+            detect_img(YOLO(**vars(FLAGS)))
     elif "input" in FLAGS:
         detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
     else:

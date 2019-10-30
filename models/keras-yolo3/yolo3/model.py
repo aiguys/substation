@@ -190,7 +190,7 @@ def yolo_eval(yolo_outputs,
               image_shape,
               max_boxes=20,
               score_threshold=.6,
-              iou_threshold=.5):
+              iou_threshold=.8):
     """Evaluate YOLO model on given input and return filtered boxes."""
     num_layers = len(yolo_outputs)
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]] # default setting
@@ -205,15 +205,20 @@ def yolo_eval(yolo_outputs,
     boxes = K.concatenate(boxes, axis=0)
     box_scores = K.concatenate(box_scores, axis=0)
 
-    mask = box_scores >= score_threshold
+    #mask = box_scores >= score_threshold # return boolean results array, select box_score >= thread
     max_boxes_tensor = K.constant(max_boxes, dtype='int32')
     boxes_ = []
     scores_ = []
     classes_ = []
     for c in range(num_classes):
         # TODO: use keras backend instead of tf.
-        class_boxes = tf.boolean_mask(boxes, mask[:, c])
-        class_box_scores = tf.boolean_mask(box_scores[:, c], mask[:, c])
+        # 我的改造对mask
+        box_score = box_scores[:, c]
+        mask = box_score >= score_threshold[c]
+        #mask  >= score_threshold[c]  # return boolean results array, select box_score >= thread
+
+        class_boxes = tf.boolean_mask(boxes, mask)
+        class_box_scores = tf.boolean_mask(box_scores[:, c], mask)
         nms_index = tf.image.non_max_suppression(
             class_boxes, class_box_scores, max_boxes_tensor, iou_threshold=iou_threshold)
         class_boxes = K.gather(class_boxes, nms_index)

@@ -14,6 +14,7 @@ from keras.models import load_model
 from keras.layers import Input
 from PIL import Image, ImageFont, ImageDraw
 
+
 from yolo3.model_Mobilenet import yolo_eval, yolo_body, tiny_yolo_body
 from yolo3.utils import letterbox_image
 import os
@@ -24,9 +25,9 @@ gpu_num=1
 class YOLO(object):
     def __init__(self):
         #self.model_path = 'model_data/mobilenet_1_0_224_tf.h5' # model path or trained weights path
-        self.model_path = 'model_data/ep003-loss58.622-val_loss59.096.h5'
+        self.model_path = 'model_data/ep042-loss23.381-val_loss23.173.h5'
         self.anchors_path = 'model_data/yolo_anchors.txt'
-        self.classes_path = 'model_data/hat_classes.txt'
+        self.classes_path = 'model_data/eight_classes.txt'
         self.score = 0.3
         self.iou = 0.45
         self.class_names = self._get_class()
@@ -93,6 +94,75 @@ class YOLO(object):
         # self.yolo_model->'model_data/yolo.h5'
         # self.anchors->'model_data/yolo_anchors.txt'-> 9 scales for anchors
         return boxes, scores, classes
+
+    def detect_image2(self, image):
+        start = timer()
+
+        if self.model_image_size != (None, None):
+            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+        else:
+            new_image_size = (image.width - (image.width % 32),
+                              image.height - (image.height % 32))
+            boxed_image = letterbox_image(image, new_image_size)
+        image_data = np.array(boxed_image, dtype='float32')
+
+        print(image_data.shape)
+        image_data /= 255.
+        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+
+        out_boxes, out_scores, out_classes = self.sess.run(
+            [self.boxes, self.scores, self.classes],
+            feed_dict={
+                self.yolo_model.input: image_data,
+                self.input_image_shape: [image.size[1], image.size[0]],
+                K.learning_phase(): 0
+            })
+
+        print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
+
+        font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
+                    size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+        thickness = (image.size[0] + image.size[1]) // 300
+
+        for i, c in reversed(list(enumerate(out_classes))):
+            predicted_class = self.class_names[c]
+            box = out_boxes[i]
+            score = out_scores[i]
+
+            label = '{} {:.2f}'.format(predicted_class, score)
+            draw = ImageDraw.Draw(image)
+            label_size = draw.textsize(label, font)
+
+            bbox = dict([("score", str(score)), ("x1", str(left)), ("y1", str(top)), ("x2", str(right)), ("y2", str(bottom))])
+
+            top, left, bottom, right = box
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
+            print(label, (left, top), (right, bottom))
+
+            if top - label_size[1] >= 0:
+                text_origin = np.array([left, top - label_size[1]])
+            else:
+                text_origin = np.array([left, top + 1])
+
+            # My kingdom for a good redistributable image drawing library.
+            for i in range(thickness):
+                draw.rectangle(
+                    [left + i, top + i, right - i, bottom - i],
+                    outline=self.colors[c])
+            draw.rectangle(
+                [tuple(text_origin), tuple(text_origin + label_size)],
+                fill=self.colors[c])
+            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
+            del draw
+
+        end = timer()
+        print(end - start)
+        return image
 
     def detect_image(self, image):
         # start = timer()
@@ -228,7 +298,7 @@ def detect_img(yolo):
             print('Open Error! Try again!')
             continue
         else:
-            r_image = yolo.detect_image(image)
+            r_image = yolo.detect_image2(image)
             r_image.show()
     yolo.close_session()
 
@@ -288,7 +358,7 @@ def detect_test(yolo,json_name,test_out_json = 'caltech_new_result_0.001.json',d
         outfile.close()
     yolo.close_session()
 
-def car_detect(yolo,mainFolder = '/home/wenwen/Viewnyx/FrameImages/'):
+def car_detect(yolo,mainFolder = 'D:\GitHub_Repository\substation\models\keras-yolo3'):
     import json
     fold_list = range(1, 15)
 
@@ -329,6 +399,7 @@ def car_detect(yolo,mainFolder = '/home/wenwen/Viewnyx/FrameImages/'):
 
 
 if __name__ == '__main__':
-    car_detect(YOLO())
+    detect_img(YOLO())
+    #car_detect(YOLO())
     #detect_test(YOLO(), json_name='../mrsub/mrsub_test.json',test_out_json='mobilenet_train_bw_test_mrsub.json', data_dst='../mrsub/')
     #detect_test_draw(YOLO(), json_name='dataset/brainwash/test_boxes.json',test_pic='./mobilenet_test/')

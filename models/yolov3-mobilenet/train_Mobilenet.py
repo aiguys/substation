@@ -17,9 +17,9 @@ from yolo3.utils import get_random_data
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 def _main():
     train_path = 'train.txt'
-    log_dir = 'logs/Mobilenet_finetune/'
+    log_dir = 'logs/Mobilenet_finetunenewAnchos/'
     classes_path = 'model_data/hat_classes.txt'
-    anchors_path = 'model_data/tiny_yolo_anchors.txt'
+    anchors_path = 'model_data/yolo_anchorskmeans.txt'
     class_names = get_classes(classes_path)
     num_classes = len(class_names)
     anchors = get_anchors(anchors_path)
@@ -33,7 +33,8 @@ def _main():
             freeze_body=2)
     else:
         model = create_model(input_shape, anchors, num_classes,load_pretrained=True,
-                             weights_path='model_data/ep027-loss42.438-val_loss39.807.h5',
+                             # weights_path='D:\GitHub_Repository\substation\models\keras-yolo3\model_data\yolo_weights.h5',
+                             weights_path= 'logs\Mobilenet_finetunenewAnchos\ep002-loss309.164-val_loss323.797.h5',
             freeze_body=2) # make sure you know what you freeze
 
     logging = TensorBoard(log_dir=log_dir)
@@ -53,6 +54,7 @@ def _main():
 
     # Train with frozen layers first, to get a stable loss.
     # Adjust num epochs to your dataset. This step is enough to obtain a not bad model.
+    '''''
     if True:
         model.compile(optimizer=Adam(lr=1e-3), loss={
             # use custom yolo_loss Lambda layer.
@@ -64,10 +66,11 @@ def _main():
                 steps_per_epoch=max(1, num_train//batch_size),
                 validation_data=data_generator_wrapper(t_lines[num_train:], batch_size, input_shape, anchors, num_classes),
                 validation_steps=max(1, num_val//batch_size),
-                epochs=20,
+                epochs=25,
                 initial_epoch=0,
                 callbacks=[logging, checkpoint])
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
+    '''''
 
     # Unfreeze and continue training, to fine-tune.
     # Train longer if the result is not good.
@@ -76,14 +79,14 @@ def _main():
         for i in range(len(model.layers)):
             model.layers[i].trainable= True
         model.compile(optimizer=Adam(lr=1e-4), loss={'yolo_loss': lambda y_true, y_pred: y_pred}) # recompile to apply the change
-        batch_size = 8 # note that more GPU memory is required after unfreezing the body
+        batch_size = 4 # note that more GPU memory is required after unfreezing the body
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
         model.fit_generator(data_generator_wrapper(t_lines[:num_train], batch_size, input_shape, anchors, num_classes),
             steps_per_epoch=max(1, num_train//batch_size),
             validation_data=data_generator_wrapper(t_lines[num_train:], batch_size, input_shape, anchors, num_classes),
             validation_steps=max(1, num_val//batch_size),
             epochs=40,
-            initial_epoch=20,
+            initial_epoch=2,
             callbacks=[logging, checkpoint, reduce_lr, early_stopping])
         model.save_weights(log_dir + 'trained_weights_final.h5')
 
