@@ -6,16 +6,15 @@ Run a YOLO_v3 style detection model on test images.
 
 import colorsys
 import os
-import argparse
 from timeit import default_timer as timer
+import tensorflow as tf
 import cv2
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 from keras import backend as K
 from keras.models import load_model
 from keras.layers import Input
 from PIL import Image, ImageFont, ImageDraw
-import time
 
 
 from yolo3.model_Mobilenet import yolo_eval, yolo_body, tiny_yolo_body
@@ -26,29 +25,18 @@ from keras.utils import multi_gpu_model
 gpu_num=1
 
 class YOLO(object):
-    _defaults = {
-        "model_path" : 'logs/nine_classes_newAnchors/ep052-loss27.579-val_loss27.353.h5',
-        "anchors_path" : 'model_data/nineclasses_yolo_anchors.txt',
-        "classes_path" : 'model_data/nine_classes.txt',
-        "score" : [0.3, 0.3, 0.1, 0.1, 0.1, 0.1, 0.3, 0.3, 0.3], # ["hat", "nohat", "glove", "noglove", "boots", "noboots", "safetybelt", "nosafetybelt", "person"]
-        "iou" : 0.45,
-        "model_image_size" : (320, 320),
-    }
-    def __init__(self,**kwargs):
+    def __init__(self):
         #self.model_path = 'model_data/mobilenet_1_0_224_tf.h5' # model path or trained weights path
-        self.__dict__.update(self._defaults)  # set up default values
-        self.__dict__.update(kwargs)  # and update with user overrides
+        self.model_path = 'model_data/ep042-loss23.381-val_loss23.173.h5'
+        self.anchors_path = 'model_data/yolo_anchors.txt'
+        self.classes_path = 'model_data/eight_classes.txt'
+        self.score = 0.3
+        self.iou = 0.45
         self.class_names = self._get_class()
         self.anchors = self._get_anchors()
         self.sess = K.get_session()
+        self.model_image_size = (320, 320) # fixed size or (None, None), hw
         self.boxes, self.scores, self.classes = self.generate()
-
-    @classmethod
-    def get_defaults(cls, n):
-        if n in cls._defaults:
-            return cls._defaults[n]
-        else:
-            return "Unrecognized attribute name '" + n + "'"
 
 
     def _get_class(self):
@@ -110,7 +98,7 @@ class YOLO(object):
         # self.anchors->'model_data/yolo_anchors.txt'-> 9 scales for anchors
         return boxes, scores, classes
 
-    def detect_image2(self, image, list_file):
+    def detect_image2(self, image):
         start = timer()
 
         if self.model_image_size != (None, None):
@@ -150,6 +138,7 @@ class YOLO(object):
             draw = ImageDraw.Draw(image)
             label_size = draw.textsize(label, font)
 
+            #bbox = dict([("score", str(score)), ("x1", str(left)), ("y1", str(top)), ("x2", str(right)), ("y2", str(bottom))])
 
             top, left, bottom, right = box
             top = max(0, np.floor(top + 0.5).astype('int32'))
@@ -162,14 +151,6 @@ class YOLO(object):
                 text_origin = np.array([left, top - label_size[1]])
             else:
                 text_origin = np.array([left, top + 1])
-
-            '''''
-            start to write detect results down in txt files. Format as '<class_name> <confidence> <left> <top> <right> <bottom>'
-            eg. bottle 0.287150 336 231 376 305
-            '''''
-            list_file.write(str(label) + " " + str(left) + " " + str(top) + " " + str(right) + " " + str(bottom) + '\n')
-
-            ''''            ******分割线*******  '''''
 
             # My kingdom for a good redistributable image drawing library.
             for i in range(thickness):
@@ -309,39 +290,6 @@ def detect_video(yolo, video_path, output_path=""):
             break
     yolo.close_session()
 
-def detect_multi_img(yolo):
-    imgid_wd = 'D:\GitHub_Repository\Data\substation'
-    wd = os.getcwd()
-
-    if not os.path.exists(wd + '\detection-results'):
-        os.makedirs(wd + '\detection-results')
-    image_ids = open(
-        'D:\GitHub_Repository\Data\substation\ImageSets\Main_nineclasses\%s.txt' % ('test_noAnnotation')).read().strip().split()
-    for image_id in image_ids:
-        try:
-            # print(wd + '\JPEGImages\\' + image_id)
-            if image_id.split('\\')[0] == 'background':
-                image_id = image_id.split('\\')[1]
-                image = Image.open(imgid_wd + '\\background\\%s.jpg' % (image_id))
-            elif image_id.split('\\')[0] == 'moreJPEGImages':
-                image_id = image_id.split('\\')[1]
-                image = Image.open(imgid_wd + '\moreJPEGImages\\%s.jpg' % (image_id))
-            #elif image_id.split('\\')[0] == 'JPEGImages':
-            else:
-                image = Image.open(imgid_wd + '\JPEGImages\\%s.jpg' % (image_id))
-        except:
-            print('Open Error!' + image_id)
-            break
-        else:
-            list_file = open(wd + '\detection-results\%s.txt' % (image_id), 'w')  # 以写模式为每一张image创建txt文件
-            start = time.clock()
-            print("Inference and processing on " + image_id)
-            yolo.detect_image2(image, list_file)
-            elapsed = (time.clock() - start)
-            print("Time used:", elapsed)
-
-    yolo.close_session()
-
 
 def detect_img(yolo):
     while True:
@@ -372,53 +320,104 @@ def detect_img(yolo):
             r_image.show()
     yolo.close_session()
 
+def detect_test_draw(yolo,json_name,test_pic):
+    import cv2
+    import json
 
-FLAGS = None
+    data_dst = 'dataset/brainwash/'
+    with open(json_name) as load_f:
+        load_dict = json.load(load_f)
+        for pic in load_dict:
+            picname = pic['image_path']
+            root,name = os.path.split(picname)
+            print(name)
+            image = Image.open(data_dst + picname)
+            rects = yolo.detect_image(image)
+            frame = cv2.imread(data_dst+picname)
+            for rect in rects:
+                score, x1, y1, x2, y2 = float(rect['score']),int(float(rect['x1'])),int(float(rect['y1'])),int(float(rect['x2'])),int(float(rect['y2']))
+                cv2.rectangle(frame,(x1,y1),(x2,y2),(255,255,255),1)
+            cv2.imwrite(test_pic+name,frame)
+    yolo.close_session()
+
+def detect_test(yolo,json_name,test_out_json = 'caltech_new_result_0.001.json',data_dst = '../caltech_ped/caltech-pedestrian-dataset-converter/'):
+    import json
+    import time
+
+    #
+    with open(json_name) as load_f:
+        load_dict = json.load(load_f)
+    count = 0
+    json_images=[]
+    with open(test_out_json,'w') as outfile:
+        time_start = time.time()
+
+        for pic in load_dict:
+            # root, filename = os.path.split(pic['image_path'])
+            # name = filename.split('.')[0]
+            # set_id, v_id, frame_id = name.split('_')
+            # frame_id = int(frame_id)
+            #
+            # if frame_id % 30 == 0 and frame_id != 0:
+                picname = pic['image_path'][2:]
+                count +=1
+                print(picname)
+                image = Image.open(data_dst + picname)
+                rects = yolo.detect_image(image)
+                json_image = dict([("image_path", picname), ("rects", rects)])
+                json_images.append(json_image)
+
+        time_end = time.time()
+        duration = time_end - time_start
+        print('totally cost', duration)
+        print('{} pictures , average time {}'.format(count,duration/count))
+        str = json.dumps(json_images,indent=4)
+        outfile.write(str)
+        outfile.close()
+    yolo.close_session()
+
+def car_detect(yolo,mainFolder = 'D:\GitHub_Repository\substation\models\keras-yolo3'):
+    import json
+    fold_list = range(1, 15)
+
+    for i in fold_list:
+        foldname = mainFolder+'video'+str(i)
+        list = os.listdir(foldname)  # 列出文件夹下所有的目录与文件
+        json_all = {}
+        json_f = open('car/'+'annotation_{}_YOLOv3.json'.format('video'+str(i)),'w')
+        for i in range(0, len(list)):
+            name,ext = os.path.splitext(list[i])
+            if ext=='.jpg':
+                print(list[i])
+                json_pic = {}
+                annotation = []
+                image = Image.open(foldname+'/'+list[i])
+                rects = yolo.detect_image(image)
+                for rect in rects:
+                    score, x1, y1, x2, y2 = float(rect['score']), int(float(rect['x1'])), int(float(rect['y1'])), int(
+                        float(rect['x2'])), int(float(rect['y2']))
+                    bbox = {"category": "sideways",
+                            "id": 0,
+                            "shape": ["Box",1],
+                            "label": "car",
+                            "x":x1,
+                            "y":y1,
+                            "width":x2-x1,
+                            "height":y2-y1,
+                            "score":score}
+                    annotation.append(bbox)
+                json_pic["annotations"]=annotation
+                json_pic["height"] = 480
+                json_pic["name"] =  list[i]
+                json_pic["width"] =  640
+                json_all[list[i]] = json_pic
+        json_f.write(json.dumps(json_all,indent=4))
+        json_f.close()
+    yolo.close_session()
+
 
 if __name__ == '__main__':
-   # detect_img(YOLO())
-
-    # class YOLO defines the default value, so suppress any default here
-    parser = argparse.ArgumentParser(argument_default=argparse.SUPPRESS)
-    '''
-    Command line options
-    '''
-    parser.add_argument(
-        '--model', type=str,
-        help='path to model weight file, default ' + YOLO.get_defaults("model_path")
-    )
-
-    parser.add_argument(
-        '--anchors', type=str,
-        help='path to anchor definitions, default ' + YOLO.get_defaults("anchors_path")
-    )
-
-    parser.add_argument(
-        '--classes', type=str,
-        help='path to class definitions, default ' + YOLO.get_defaults("classes_path")
-    )
-
-    parser.add_argument(
-        '--gpu_num', type=int,
-        help='Number of GPU to use, default ' + str(YOLO.get_defaults("gpu_num"))
-    )
-
-    parser.add_argument(
-        '--multiMode', default=False, action="store_true",
-        help='Image detection mode with multiple imgs detection results file generation'
-    )
-
-    FLAGS = parser.parse_args()
-
-    if FLAGS.multiMode:
-        """
-        Image detection mode, disregard any remaining command line arguments
-        """
-        print("Image detection mode")
-        if "input" in FLAGS:
-            print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
-        detect_multi_img(YOLO(**vars(FLAGS)))
-
-    else:
-        detect_img(YOLO(**vars(FLAGS)))
-
+    detect_img(YOLO())
+    #car_detect(YOLO())
+    #detect_test(YOLO(), json_name='../mrsub/mrsub_test.json',test_out_json='mobilenet_train_bw_test_mrsub.json', data_dst='../mrsub/')
+    #detect_test_draw(YOLO(), json_name='dataset/brainwash/test_boxes.json',test_pic='./mobilenet_test/')

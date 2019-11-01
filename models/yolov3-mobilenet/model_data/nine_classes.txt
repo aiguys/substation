@@ -1,0 +1,9 @@
+hat
+nohat
+glove
+noglove
+boots
+noboots
+safetybelt
+nosafetybelt
+person

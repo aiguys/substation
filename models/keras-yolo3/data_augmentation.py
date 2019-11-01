@@ -82,7 +82,7 @@ def get_image(line):
 
 
 if __name__ == '__main__':
-    #''''
+    ''''
     images_path = 'train.txt'
     imgName_Path = 'D:\GitHub_Repository\Data\VOC2028Helmet\ImageSets\Main\\train.txt'
     output_dir = 'D:\GitHub_Repository\Data\VOC2028Helmet\\augmentation\\'
@@ -125,9 +125,9 @@ if __name__ == '__main__':
             cv2.imwrite(output_dir + name , output_img)
             print("saving image:" + name)
             j += 1
-    #'''''
+    '''''
 
-    ''''
+    #''''
     # Load and display random sample and their bounding boxes
     img = "000104.jpg"
     image = cv2.imread(img,1)
@@ -162,4 +162,4 @@ if __name__ == '__main__':
 
     ia.imshow(np.hstack(images_aug))
     # ia.imshow(image_aug)
-    '''''
+    #'''''
