@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import xml.etree.ElementTree as ET
+import xml.dom.minidom as DT
+from PIL import Image
 
 ## This py file is used to generate train.txt and test.txt files
 '''' # rename all image files with its specific image_id
@@ -18,25 +20,25 @@ for root, dirs, files in os.walk(wd):
 
 def txtFilePreparation():
     wd = os.getcwd()
-    pic_path = wd + '\JPEGImages'
-    anno_path = wd + '\Annotations'
+    pic_path = wd + '\moreJPEGImages'
+    anno_path = wd + '\moreAnnotations'
    # pic_path = wd + '\JPEGImages'
-    JPEGImage_txt = 'JPEGImages.txt'
-    pic_path_name = '\JPEGImages'
+    JPEGImage_txt = 'moreJPEGImages.txt'
+    pic_path_name = '\moreJPEGImages'
 
-    # classes = ["hat", "nohat", "glove", "noglove", "boots", "noboots", "safetybelt", "nosafetybelt", "person"]
+    #classes = ["hat", "nohat", "glove", "noglove", "boots", "noboots", "safetybelt", "nosafetybelt", "person"]
     # classes = ["hat", "nohat", "glove", "noglove", "boots", "noboots", "safetybelt", "nosafetybelt"]
-    classes = ["hat","nohat","safetybelt", "nosafetybelt"]
-    # classes = ['hat','person']
+    #classes = ["glove", "noglove", "boots", "noboots"]
+    classes = ['hat','person',"safetybelt", "nosafetybelt"]
     #classes = ['hat', 'nohat']
 
     list_file = open(JPEGImage_txt, 'w')
     background_file = open('background.txt', 'w')
-    train_files = open('ImageSets\Main_belt&Hat\\train.txt', 'w')
-    test_files = open('ImageSets\Main_belt&Hat\\test.txt', 'w')
+    train_files = open('ImageSets\Main_moreImages\\train.txt', 'w')
+    test_files = open('ImageSets\Main_moreImages\\test.txt', 'w')
 
 
-    #''' comment when deal with Main_moreImages
+    ''' comment when deal with Main_moreImages
     # get 5% background random txt files written into 'JPEGImages.txt'
     background_path = wd + '\\background'
     files = os.listdir(background_path)
@@ -53,7 +55,7 @@ def txtFilePreparation():
 
     for backgroundImg_path in lines[:num_background]:
         list_file.write(backgroundImg_path)
-    #'''
+    '''
 
     # ***************get train and test txt files******************
     files = os.listdir(pic_path)
@@ -129,8 +131,8 @@ def convert_annotation(image_id, list_file, classes, anno_path, time_):
         if cls not in classes or int(difficult)==1:
             continue
         # we don't want more data for 'hat' and 'nohat' from new data now
-        if cls in ['hat','nohat'] and time_ == '20191024':
-            continue
+        #if cls in ['hat','nohat'] and time_ == '20191024':
+        #    continue
         cls_id = classes.index(cls)
         xmlbox = obj.find('bndbox')
         b = (int(xmlbox.find('xmin').text), int(xmlbox.find('ymin').text), int(xmlbox.find('xmax').text), int(xmlbox.find('ymax').text))
@@ -151,20 +153,126 @@ def ifAllUnwanttedclass(image_id, classes, anno_path):
 
     return True
 
+# This method is used to modify xml file, extracting 'part'('hand','head','foot') from super class 'object'
+# After extracting, deleting 'part' and remain new 'object'('hand','head','foot').
+def xml_modify():
+    wd = 'D:\GitHub_Repository\Data\VOC2012'
+    anno_path = wd + '\personLayoutAnnotations\\'
+    anno_new_path = wd + '\personLayoutNewAnnotations\\'
+
+    files_list = os.listdir(anno_path)
+    for file in files_list:
+        in_file = open(anno_path + file, 'r', encoding='UTF-8')  # %(year, image_id)
+        tree = ET.parse(in_file)
+        root = tree.getroot()
+
+        parts = tree.findall('object/part')
+        for part in parts:
+            print('name', part.find('name').text)
+            cls = part.find('name').text
+            if cls == 'hand':
+                cls = 'noglove'
+            elif cls == 'foot':
+                cls = 'noboots'
+            elif cls == 'head':
+                cls = 'nohat'
+            bbox = part.find('bndbox')
+            xmin = int(bbox.find('xmin').text)
+            ymin = int(bbox.find('ymin').text)
+            xmax = int(bbox.find('xmax').text)
+            ymax = int(bbox.find('ymax').text)
+
+            # 创建一级目录
+            #obj = ET.Element('object', {'name': cls, 'bndbox': [xmin, ymin, xmax, ymax]})
+            obj = ET.Element('object')
+
+            name = ET.Element('name')
+            name.text = cls
+            obj.append(name)
+            diffcult = ET.Element('difficult')
+            diffcult.text = '0'
+            obj.append(diffcult)
+
+            bndbox = ET.Element('bndbox')
+
+            xmin_node = ET.Element('xmin')
+            ymin_node = ET.Element('ymin')
+            xmax_node = ET.Element('xmax')
+            ymax_node = ET.Element('ymax')
+            xmin_node.text = str(xmin)
+            ymin_node.text = str(ymin)
+            xmax_node.text = str(xmax)
+            ymax_node.text = str(ymax)
+            bndbox.append(xmin_node)
+            bndbox.append(ymin_node)
+            bndbox.append(xmax_node)
+            bndbox.append(ymax_node)
+
+            obj.append(bndbox)
+
+           # ET.SubElement(bndbox, 'xmin',{'xmin' : xmin})
+           # ET.SubElement(bndbox, 'ymin',{'ymin' : ymin})
+          #  ET.SubElement(bndbox, 'xmax',{'xmax' : xmax})
+           # ET.SubElement(bndbox, 'ymax',{'ymax' : ymax})
+           # ET.dump(obj)
+            root.append(obj)
+
+        for obj in root.iter('object'):
+            for part in parts:
+                if part in obj:
+                    obj.remove(part)
+        tree.write(anno_new_path + file, encoding='utf-8', xml_declaration=True)
+
+# This method is used to modify xml file, selecting images that has not more than 15'nohat' labels on image
+def xml_selecting():
+    wd = 'D:\GitHub_Repository\Data\substation'
+    anno_path = wd + '\moreAnnotations\\'
+    anno_new_path = wd + '\\nohatSelectedNewMoreAnnotations\\'
+    max_nohat = 15
+
+    files_list = os.listdir(anno_path)
+    for file in files_list:
+        in_file = open(anno_path + file, 'r', encoding='UTF-8')  # %(year, image_id)
+        tree = ET.parse(in_file)
+        root = tree.getroot()
+
+        objs = tree.findall('object')
+        num_nohat = 0
+        for obj in objs:
+            cls = obj.find('name').text
+            if cls == 'person':
+                num_nohat += 1
+
+        if num_nohat <= max_nohat:
+            tree.write(anno_new_path + file, encoding='utf-8', xml_declaration=True)
+
+
+
+
 
 if __name__ == '__main__':
+    #xml_modify()
+    #xml_selecting()
     txtFilePreparation()
 
-    ''' # shuffle train.txt
-    path = 'D:\GitHub_Repository\Data\substation\\train.txt'
-    list_file = open('shuffled_train.txt', 'w')
-    with open(path) as f:
-        lines = f.readlines()  # Lines JPEGImages.txt文件中所有rows image地址
-    np.random.seed(24)
-    np.random.shuffle(lines)
-    for line in lines:
-        list_file.write(line)
-    '''
+    ''''
+    wd = 'D:\GitHub_Repository\Data\VOC2012'
+    anno_path = wd + '\morePersonAnnotations\\'
+    anno_new_path = wd + '\morePersonNewAnnotations\\'
+
+    files_list = os.listdir(anno_path)
+    for file in files_list:
+        in_file = open(anno_path + file, 'r', encoding='UTF-8')  # %(year, image_id)
+        tree = ET.parse(in_file)
+        root = tree.getroot()
+
+        for obj in root.findall('object'):
+            cls = obj.find('name').text
+            if cls != 'person':
+                root.remove(obj)
+
+        tree.write(anno_new_path + file, encoding='utf-8', xml_declaration=True)
+        '''''
 
 
 

@@ -1,0 +1,4 @@
+glove
+noglove
+boots
+noboots

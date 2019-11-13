@@ -1,0 +1,4 @@
+--model_path=D:\GitHub_Repository\substation\models\yolov3-mobilenet\logs\belt_hat\mobilenet-belt_hatClass-val_loss15.316.h5  
+--anchors_path=D:\GitHub_Repository\substation\models\yolov3-mobilenet\logs\belt_hat\hat-beltclasses_yolo_anchors.txt 
+--classes_path=D:\GitHub_Repository\substation\models\yolov3-mobilenet\logs\belt_hat\hat-beltclasses.txt  
+--input=D:\GitHub_Repository\test.mp4    --output=D:\GitHub_Repository\output_video\output1.mp4

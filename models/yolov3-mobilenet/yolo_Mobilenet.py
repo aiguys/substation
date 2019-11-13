@@ -8,7 +8,7 @@ import colorsys
 import os
 import argparse
 from timeit import default_timer as timer
-import cv2
+#import cv2
 #import matplotlib.pyplot as plt
 import numpy as np
 from keras import backend as K
@@ -27,11 +27,11 @@ gpu_num=1
 
 class YOLO(object):
     _defaults = {
-        "model_path" : 'logs/nine_classes_newAnchors/ep052-loss27.579-val_loss27.353.h5',
-        "anchors_path" : 'model_data/nineclasses_yolo_anchors.txt',
-        "classes_path" : 'model_data/nine_classes.txt',
-        "score" : [0.3, 0.3, 0.1, 0.1, 0.1, 0.1, 0.3, 0.3, 0.3], # ["hat", "nohat", "glove", "noglove", "boots", "noboots", "safetybelt", "nosafetybelt", "person"]
-        "iou" : 0.45,
+        "model_path" : 'logs/HBP/mobilenet-HBP-val_loss15.705.h5',
+        "anchors_path" : 'model_data/HBP_classes_yolo_anchors.txt',
+        "classes_path" : 'model_data/HBP_classes.txt',
+        "score" : [0.2, 0.5, 0.2, 0.2, 0.2, 0.1, 0.2, 0.3, 0.3], # ["hat", "nohat", "glove", "noglove", "boots", "noboots", "safetybelt", "nosafetybelt", "person"]
+        "iou" : 0.35,
         "model_image_size" : (320, 320),
     }
     def __init__(self,**kwargs):
@@ -110,7 +110,7 @@ class YOLO(object):
         # self.anchors->'model_data/yolo_anchors.txt'-> 9 scales for anchors
         return boxes, scores, classes
 
-    def detect_image2(self, image, list_file):
+    def detect_image2(self, image, list_file):  # add ‘list_file’ to input file for multi-images detection Mode
         start = timer()
 
         if self.model_image_size != (None, None):
@@ -170,7 +170,7 @@ class YOLO(object):
             list_file.write(str(label) + " " + str(left) + " " + str(top) + " " + str(right) + " " + str(bottom) + '\n')
 
             ''''            ******分割线*******  '''''
-
+            '''' # unexpected error when multiMode detection
             # My kingdom for a good redistributable image drawing library.
             for i in range(thickness):
                 draw.rectangle(
@@ -181,6 +181,7 @@ class YOLO(object):
                 fill=self.colors[c])
             draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
+            '''''
 
         end = timer()
         print(end - start)
@@ -268,6 +269,65 @@ class YOLO(object):
     def close_session(self):
         self.sess.close()
 
+    def getColor(self, c):
+        return self.colors[c]
+
+    def getClass_names(self, c):
+        return self.class_names[c]
+
+    def detect_image_value(self, image):
+        start = timer()
+
+        if self.model_image_size != (None, None):
+            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+        else:
+            new_image_size = (image.width - (image.width % 32),
+                              image.height - (image.height % 32))
+            boxed_image = letterbox_image(image, new_image_size)
+        image_data = np.array(boxed_image, dtype='float32')
+
+        #print(image_data.shape)
+        image_data /= 255.
+        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+
+        out_boxes, out_scores, out_classes = self.sess.run(
+            [self.boxes, self.scores, self.classes],
+            feed_dict={
+                self.yolo_model.input: image_data,
+                self.input_image_shape: [image.size[1], image.size[0]],
+                K.learning_phase(): 0
+            })
+
+        #print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
+
+        real_boxes = []
+        real_classes = []
+        real_scores = []
+        for i, c in reversed(list(enumerate(out_classes))):
+            predicted_class = self.class_names[c]
+
+            box = out_boxes[i]
+            score = out_scores[i]
+
+            label = '{} {:.2f}'.format(predicted_class, score)
+
+            top, left, bottom, right = box
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
+            #print(label, (left, top), (right, bottom))
+
+            real_boxes.append((left, top, right, bottom))
+            real_classes.append(c)
+            real_scores.append(score)
+
+        end = timer()
+        #print(end - start)
+        return (real_boxes, real_scores, real_classes)
+
 
 def detect_video(yolo, video_path, output_path=""):
     vid = cv2.VideoCapture(video_path)
@@ -316,7 +376,7 @@ def detect_multi_img(yolo):
     if not os.path.exists(wd + '\detection-results'):
         os.makedirs(wd + '\detection-results')
     image_ids = open(
-        'D:\GitHub_Repository\Data\substation\ImageSets\Main_nineclasses\%s.txt' % ('test_noAnnotation')).read().strip().split()
+        'D:\GitHub_Repository\Data\substation\ImageSets\Main_HBP\%s.txt' % ('test_noAnnotation')).read().strip().split()
     for image_id in image_ids:
         try:
             # print(wd + '\JPEGImages\\' + image_id)
@@ -344,16 +404,15 @@ def detect_multi_img(yolo):
 
 
 def detect_img(yolo):
+    img_path = 'D:\GitHub_Repository\substation\models\yolov3-mobilenet\TestImages'
     while True:
         img = input('Input image filename:')
         try:
-            image = Image.open(img)
+            image = Image.open(img_path + '\\' + img)
         except:
             print('Open Error! Try again!')
             continue
         else:
-            #img_path = 'D:\GitHub_Repository\substation\models\yolov3-mobilenet'
-            #frame = cv2.imread(img_path + '\\' + img)
             r_image = yolo.detect_image2(image)
             ''''
             rects = yolo.detect_image(image)
@@ -375,6 +434,7 @@ def detect_img(yolo):
 
 FLAGS = None
 
+# for image detection mode
 if __name__ == '__main__':
    # detect_img(YOLO())
 

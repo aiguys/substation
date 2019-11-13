@@ -1,6 +1,7 @@
 import sys
 import argparse
 from yolo import YOLO, detect_video
+from video_detect import detect_camera3
 from PIL import Image
 import time
 import os
@@ -8,10 +9,11 @@ import os
 
 def detect_img(yolo):
     # ''''
+    img_path = 'D:\GitHub_Repository\substation\models\keras-yolo3\TestImages'
     while True:
         img = input('Input image filename:')
         try:
-            image = Image.open(img)
+            image = Image.open(img_path + "\\" + img)
         except:
             print('Open Error! Try again!')
             continue
@@ -27,17 +29,25 @@ def detect_img(yolo):
 
 
 def detect_multi_img(yolo):
-    imgid_wd = 'D:\GitHub_Repository\Data\VOC2028Helmet'
+    imgid_wd = 'D:\GitHub_Repository\Data\substation'
     wd = os.getcwd()
 
     if not os.path.exists(wd + '\detection-results'):
         os.makedirs(wd + '\detection-results')
     image_ids = open(
-        'D:\GitHub_Repository\Data\VOC2028Helmet\ImageSets\Main\%s.txt' % ('test')).read().strip().split()
+        'D:\GitHub_Repository\Data\substation\ImageSets\Main_belt&hat\%s.txt' % ('test_noAnnotation')).read().strip().split()
     for image_id in image_ids:
         try:
             # print(wd + '\JPEGImages\\' + image_id)
-            image = Image.open(imgid_wd + '\JPEGImages\\%s.jpg' % (image_id))
+            if image_id.split('\\')[0] == 'background':
+                image_id = image_id.split('\\')[1]
+                image = Image.open(imgid_wd + '\\background\\%s.jpg' % (image_id))
+            elif image_id.split('\\')[0] == 'moreJPEGImages':
+                image_id = image_id.split('\\')[1]
+                image = Image.open(imgid_wd + '\moreJPEGImages\\%s.jpg' % (image_id))
+            #elif image_id.split('\\')[0] == 'JPEGImages':
+            else:
+                image = Image.open(imgid_wd + '\JPEGImages\\%s.jpg' % (image_id))
         except:
             print('Open Error!' + image_id)
             break
@@ -115,6 +125,8 @@ if __name__ == '__main__':
         else:
             detect_img(YOLO(**vars(FLAGS)))
     elif "input" in FLAGS:
-        detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
+        # detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)  # default video detect mode without tracker
+        detect_camera3(YOLO(**vars(FLAGS)), videoPath=FLAGS.input, output_path=FLAGS.output, loop=5, trackingAlt=True, # our video detect mode with tracker
+                                    isDebug=True)
     else:
         print("Must specify at least video_input_path.  See usage with --help.")
